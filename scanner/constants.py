@@ -25,4 +25,11 @@ OUTPUT_FIELDS = [
     "Creator",
     "Producer",
     "Pages",
+    "ImageObjectsFound",
+    "PagesWithImages",
+    "FiguresFound",
+    "FiguresWithAlt",
+    "FiguresWithActualTextOnly",
+    "FiguresWithoutAlt",
+    "FiguresAltTextTest",
 ]
