@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "simpla11ypdfcrawler"
+version = "2.0.0"
+description = "PDF accessibility crawler and scanner"
+authors = ["Bloom Works"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "scanner" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+scrapy = "*"
+pikepdf = ">=10.5,<11.0"
+langcodes = "*"
+pdfminer-six = "*"
+bitstring = "*"
+dateparser = "*"
+pytz = "*"
+typer = "*"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
