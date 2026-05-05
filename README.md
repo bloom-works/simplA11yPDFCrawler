@@ -13,32 +13,33 @@ Most of the [accessibility reports (in french)](https://data.public.lu/fr/datase
 
 ## PDF accessibility tests
 
-The checker runs document-level tests, structure-tree tests, annotation tests, form tests, figure/alt-text tests, heading tests, list tests and table tests.
+The checker runs document-level tests, page-content tagging tests, structure-tree tests, annotation tests, form tests, figure/alt-text tests, heading tests, list tests and table tests.
 
-| Category       | Test                    | Description                                                                                                                              |
-| -------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| Document       | `EmptyTextTest`         | Checks whether the file appears to contain real text or only images. This can detect scanned/image-only PDFs without OCR.                |
-| Document       | `TaggedTest`            | Checks whether the document has a PDF structure tree and is marked as tagged.                                                            |
-| Document       | `ProtectedTest`         | Checks whether document permissions block access by assistive technologies.                                                              |
-| Document       | `TitleTest`             | Checks whether the PDF has a title and whether the title is configured to display in the PDF reader title bar.                           |
-| Document       | `LanguageTest`          | Checks whether the PDF has a valid default language.                                                                                     |
-| Document       | `BookmarksTest`         | Checks whether PDFs longer than 20 pages have bookmarks.                                                                                 |
-| Document       | `hasXmp`                | Checks whether XMP metadata is present.                                                                                                  |
-| Document       | `Exempt`                | Estimates whether the document is outside the legal scope based on its creation/modification date.                                       |
-| Forms          | `FormsTest`             | Checks whether interactive form fields have descriptions.                                                                                |
-| Forms          | `TaggedFormFieldsTest`  | Checks whether interactive form fields appear to be tagged or structurally represented. This is a structural approximation.              |
-| Forms          | `Form`                  | Detects whether the PDF contains AcroForm fields.                                                                                        |
-| Forms          | `xfa`                   | Detects dynamic XFA forms.                                                                                                               |
-| Annotations    | `TaggedAnnotationsTest` | Checks link annotations against link structure elements. This is a structural approximation.                                             |
-| Annotations    | annotation inventory    | Counts annotations, link annotations, widget annotations, internal links and external links.                                             |
-| Alternate Text | `FiguresAltTextTest`    | Checks whether figure structure elements have `/Alt` text, or only `/ActualText`, or no alternate text.                                  |
-| Alternate Text | `NestedAltTextTest`     | Checks for alternate text nested inside another alt-bearing structure element.                                                           |
-| Alternate Text | `HidesAnnotationTest`   | Warns when a form structure element has alternate text and an OBJR child, which can hide annotation content from assistive technologies. |
-| Images         | image object detection  | Counts image XObjects and pages containing images. Used as a fallback when the PDF is untagged.                                          |
-| Headings       | `HeadingsTest`          | Checks heading structure for skipped levels, plain `H` tags, first heading level and missing headings.                                   |
-| Lists          | `ListsTest`             | Checks PDF list structure, including `L`, `LI`, `Lbl` and `LBody` relationships.                                                         |
-| Tables         | `TablesTest`            | Checks table structure, including `TR`, `TH`, `TD`, headers and table regularity.                                                        |
-| Tables         | row/column regularity   | Detects uneven row lengths, including basic `RowSpan` and `ColSpan` handling.                                                            |
+| Category       | Test                    | Description                                                                                                                                |
+| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Document       | `EmptyTextTest`         | Checks whether the file appears to contain real text or only images. This can detect scanned/image-only PDFs without OCR.                  |
+| Document       | `TaggedTest`            | Checks whether the document has a PDF structure tree and is marked as tagged.                                                              |
+| Page Content   | `TaggedContentTest`     | Checks whether text shown in page content streams is inside marked content or an artifact. Recursively inspects text inside Form XObjects. |
+| Document       | `ProtectedTest`         | Checks whether document permissions block access by assistive technologies.                                                                |
+| Document       | `TitleTest`             | Checks whether the PDF has a title and whether the title is configured to display in the PDF reader title bar.                             |
+| Document       | `LanguageTest`          | Checks whether the PDF has a valid default language.                                                                                       |
+| Document       | `BookmarksTest`         | Checks whether PDFs longer than 20 pages have bookmarks.                                                                                   |
+| Document       | `hasXmp`                | Checks whether XMP metadata is present.                                                                                                    |
+| Document       | `Exempt`                | Estimates whether the document is outside the legal scope based on its creation/modification date.                                         |
+| Forms          | `FormsTest`             | Checks whether interactive form fields have descriptions.                                                                                  |
+| Forms          | `TaggedFormFieldsTest`  | Checks whether interactive form fields appear to be tagged or structurally represented. This is a structural approximation.                |
+| Forms          | `Form`                  | Detects whether the PDF contains AcroForm fields.                                                                                          |
+| Forms          | `xfa`                   | Detects dynamic XFA forms.                                                                                                                 |
+| Annotations    | `TaggedAnnotationsTest` | Checks link annotations against link structure elements. This is a structural approximation.                                               |
+| Annotations    | annotation inventory    | Counts annotations, link annotations, widget annotations, internal links and external links.                                               |
+| Alternate Text | `FiguresAltTextTest`    | Checks whether figure structure elements have `/Alt` text, or only `/ActualText`, or no alternate text.                                    |
+| Alternate Text | `NestedAltTextTest`     | Checks for alternate text nested inside another alt-bearing structure element.                                                             |
+| Alternate Text | `HidesAnnotationTest`   | Warns when a form structure element has alternate text and an OBJR child, which can hide annotation content from assistive technologies.   |
+| Images         | image object detection  | Counts image XObjects and pages containing images. Used as a fallback when the PDF is untagged.                                            |
+| Headings       | `HeadingsTest`          | Checks heading structure for skipped levels, plain `H` tags, first heading level and missing headings.                                     |
+| Lists          | `ListsTest`             | Checks PDF list structure, including `L`, `LI`, `Lbl` and `LBody` relationships.                                                           |
+| Tables         | `TablesTest`            | Checks table structure, including `TR`, `TH`, `TD`, headers and table regularity.                                                          |
+| Tables         | row/column regularity   | Detects uneven row lengths, including basic `RowSpan` and `ColSpan` handling.                                                              |
 
 ### Known limitations
 
@@ -48,7 +49,8 @@ Some issues cannot be reliably verified from automated checks alone, including:
 
 - logical reading order
 - color contrast
-- full page-content-to-structure association
+- full page-content-to-structure association beyond the automated tagged-content checks
+- untagged non-text drawing operations, such as vector paths, fills, strokes, shadings and image XObjects
 - multimedia accessibility
 
 ## Installation
@@ -130,6 +132,9 @@ Fields include:
 | `TotallyInaccessible`         | `True` if the PDF fails critical access checks, such as being untagged and image-only, or blocking assistive technology access. |
 | `BrokenFile`                  | `True` if the PDF could not be opened or parsed.                                                                                |
 | `TaggedTest`                  | Whether the PDF is tagged.                                                                                                      |
+| `TaggedContentTest`           | Whether text shown in page content streams appears to be tagged or artifacted.                                                  |
+| `UntaggedContentCount`        | Number of unmarked text-showing operations found in page content streams, including text inside Form XObjects.                  |
+| `UntaggedContentSummary`      | Debug-style summary of unmarked text-showing operations, including page, source, operator and text snippet.                     |
 | `EmptyTextTest`               | Whether text content appears to be present.                                                                                     |
 | `ProtectedTest`               | Whether permissions allow assistive technology access.                                                                          |
 | `TitleTest`                   | Whether the PDF title exists and is shown in the title bar.                                                                     |
@@ -274,7 +279,7 @@ The raw JSON output returns the flat internal scanner result, including all indi
 python pdfCheck.py tojsonreport path/to/file.pdf --pretty
 ```
 
-The structured accessbility report output groups results into report categories:
+The structured accessibility report output groups results into report categories:
 
 - `Summary`
 - `Detailed Report`
@@ -316,7 +321,7 @@ python pdfCheck.py tojsonreport path/to/file.pdf --compatible --pretty
 
 Compatible mode includes additional rules that this scanner does not fully automate, but which recreates the exact data shape as other industry-standard PDF accessibility reports.
 
-- Unsupported checks like "Tab order" and "Character encodong" are returned as `Skipped`.
+- Unsupported checks like "Tab order" and "Character encoding" are returned as `Skipped`.
 
 - Manual checks like "Logical Reading Order" and "Color contrast" are returned as `Needs manual check`.
 
@@ -363,6 +368,7 @@ scanner/
 
   checks/
     document.py           # Check metadata, title, tagging, protection, language, bookmarks, text
+    tagged_content.py    # Page content stream checks for unmarked text
     figures.py            # Figure and alternate text checks
     headings.py           # Heading hierarchy checks
     lists.py              # List structure checks
@@ -385,6 +391,7 @@ pytest
 The tests cover:
 
 - tagging
+- tagged content / unmarked page content
 - title
 - language
 - bookmarks
