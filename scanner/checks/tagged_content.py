@@ -1,0 +1,280 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from numbers import Number
+from typing import Any
+
+import pikepdf
+
+from scanner.structure import obj_get, safe_name
+
+# Text-showing operators only. This intentionally does not yet flag
+# unmarked vector drawing, images, shadings, or other painted content.
+TEXT_SHOWING_OPERATORS = {"Tj", "TJ", "'", '"'}
+
+# Used to determine whether text is naked page content or inside
+# marked content / artifact scope.
+MARKED_CONTENT_START_OPERATORS = {"BMC", "BDC"}
+MARKED_CONTENT_END_OPERATOR = "EMC"
+
+# Form XObjects can contain their own content streams. Adobe flags text
+# inside a Form XObject when the XObject is invoked outside marked/artifacted
+# content, so we recurse into /Form XObjects only.
+XOBJECT_PAINT_OPERATOR = "Do"
+FORM_XOBJECT_SUBTYPE = "/Form"
+
+MAX_SUMMARY_ITEMS = 50
+MAX_XOBJECT_DEPTH = 10
+
+
+@dataclass
+class UntaggedContentIssue:
+    page_number: int
+    operator: str
+    text: str
+    source: str = "page"
+
+
+def _object_ref(obj: Any) -> str | None:
+    try:
+        return repr(obj.objgen)
+    except Exception:
+        return None
+
+
+def _operator_name(operator: Any) -> str:
+    return str(operator)
+
+
+def _normalize_tag(value: Any) -> str | None:
+    tag = safe_name(value)
+    if tag is None:
+        return None
+
+    if tag.startswith("/"):
+        tag = tag[1:]
+
+    return tag
+
+
+def _marked_content_tag(operands: list[Any]) -> str | None:
+    if not operands:
+        return None
+
+    return _normalize_tag(operands[0])
+
+
+def _extract_tj_array_text(value: Any) -> str:
+    parts: list[str] = []
+
+    try:
+        for item in value:
+            if isinstance(item, Number):
+                continue
+
+            text = safe_name(item)
+            if text:
+                parts.append(text)
+    except TypeError:
+        text = safe_name(value)
+        if text:
+            parts.append(text)
+
+    return "".join(parts)
+
+
+def _extract_text_from_text_showing_operator(
+    operator_name: str,
+    operands: list[Any],
+) -> str:
+    if not operands:
+        return ""
+
+    if operator_name == "TJ":
+        return _extract_tj_array_text(operands[0])
+
+    text = safe_name(operands[-1])
+    return text or ""
+
+
+def _has_meaningful_text(text: str) -> bool:
+    return bool(text and text.strip())
+
+
+def _resolve_xobject(
+    content: Any, operands: list[Any]
+) -> tuple[str | None, Any | None]:
+    if not operands:
+        return None, None
+
+    xobject_name = operands[0]
+    xobject_name_text = safe_name(xobject_name)
+
+    resources = obj_get(content, "/Resources")
+    if resources is None:
+        return xobject_name_text, None
+
+    xobjects = obj_get(resources, "/XObject")
+    if xobjects is None:
+        return xobject_name_text, None
+
+    try:
+        return xobject_name_text, xobjects.get(xobject_name)
+    except Exception:
+        pass
+
+    if xobject_name_text:
+        try:
+            return xobject_name_text, xobjects.get(xobject_name_text)
+        except Exception:
+            pass
+
+    return xobject_name_text, None
+
+
+def _is_form_xobject(xobject: Any) -> bool:
+    if xobject is None:
+        return False
+
+    return safe_name(obj_get(xobject, "/Subtype")) == FORM_XOBJECT_SUBTYPE
+
+
+def _iter_untagged_text_in_content_stream(
+    content: Any,
+    *,
+    page_number: int,
+    marked_content_stack: list[str | None],
+    source: str,
+    visited: set[str],
+    depth: int = 0,
+) -> list[UntaggedContentIssue]:
+    issues: list[UntaggedContentIssue] = []
+
+    if depth > MAX_XOBJECT_DEPTH:
+        return issues
+
+    object_ref = _object_ref(content)
+    if object_ref:
+        visited_key = f"{page_number}:{object_ref}:{source}"
+        if visited_key in visited:
+            return issues
+        visited.add(visited_key)
+
+    try:
+        operations = pikepdf.parse_content_stream(content)
+    except Exception:
+        return issues
+
+    # Important: copy the stack for this content stream invocation.
+    stack = list(marked_content_stack)
+
+    for operands, operator in operations:
+        operator_name = _operator_name(operator)
+
+        if operator_name in MARKED_CONTENT_START_OPERATORS:
+            stack.append(_marked_content_tag(operands))
+            continue
+
+        if operator_name == MARKED_CONTENT_END_OPERATOR:
+            if stack:
+                stack.pop()
+            continue
+
+        if operator_name in TEXT_SHOWING_OPERATORS:
+            # Same rule as your current implementation:
+            # any marked-content scope means we do not report this as naked text.
+            if stack:
+                continue
+
+            text = _extract_text_from_text_showing_operator(operator_name, operands)
+
+            if _has_meaningful_text(text):
+                issues.append(
+                    UntaggedContentIssue(
+                        page_number=page_number,
+                        operator=operator_name,
+                        text=text,
+                        source=source,
+                    )
+                )
+
+            continue
+
+        if operator_name == XOBJECT_PAINT_OPERATOR:
+            xobject_name, xobject = _resolve_xobject(content, operands)
+
+            if not _is_form_xobject(xobject):
+                continue
+
+            xobject_ref = _object_ref(xobject)
+            xobject_source = "xobject"
+            if xobject_name:
+                xobject_source += f" {xobject_name}"
+            if xobject_ref:
+                xobject_source += f" {xobject_ref}"
+
+            issues.extend(
+                _iter_untagged_text_in_content_stream(
+                    xobject,
+                    page_number=page_number,
+                    marked_content_stack=stack,
+                    source=xobject_source,
+                    visited=visited,
+                    depth=depth + 1,
+                )
+            )
+
+    return issues
+
+
+def iter_untagged_text_showing_operations(pdf) -> list[UntaggedContentIssue]:
+    issues: list[UntaggedContentIssue] = []
+
+    for page_number, page in enumerate(pdf.pages, start=1):
+        issues.extend(
+            _iter_untagged_text_in_content_stream(
+                page,
+                page_number=page_number,
+                marked_content_stack=[],
+                source="page",
+                visited=set(),
+            )
+        )
+
+    return issues
+
+
+def check_tagged_content(pdf, result: dict) -> None:
+    result["TaggedContentTest"] = "NotApplicable"
+    result["UntaggedContentCount"] = 0
+    result["UntaggedContentSummary"] = ""
+
+    if result.get("TaggedTest") != "Pass":
+        result["TaggedContentTest"] = "Fail"
+        return
+
+    issues = iter_untagged_text_showing_operations(pdf)
+
+    result["UntaggedContentCount"] = len(issues)
+
+    summary_parts = [
+        (
+            f"page={issue.page_number} "
+            f"source={issue.source} "
+            f"op={issue.operator} "
+            f"text={issue.text!r}"
+        )
+        for issue in issues[:MAX_SUMMARY_ITEMS]
+    ]
+
+    if len(issues) > MAX_SUMMARY_ITEMS:
+        summary_parts.append(f"... {len(issues) - MAX_SUMMARY_ITEMS} more")
+
+    result["UntaggedContentSummary"] = " | ".join(summary_parts)
+
+    if issues:
+        result["TaggedContentTest"] = "Fail"
+        result["Accessible"] = False
+        result["_log"] += "tagged-content-fail, "
+    else:
+        result["TaggedContentTest"] = "Pass"

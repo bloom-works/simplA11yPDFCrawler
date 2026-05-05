@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-
 PASSED = "Passed"
 FAILED = "Failed"
 SKIPPED = "Skipped"
@@ -172,16 +171,25 @@ def _open_pdf_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _tagged_content_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Pass":
-        return _passed(
+    if result.get("TaggedTest") == "Fail":
+        return _failed(
+            details="Document is not tagged; page content cannot be verified as tagged."
+        )
+
+    raw = result.get("TaggedContentTest")
+
+    if raw is None:
+        return _skipped(
             note=(
-                "This scanner uses the tagged-PDF result as a lightweight "
-                "proxy for tagged content coverage."
+                "Tagged content was not checked. This usually means the scanner "
+                "result was produced before TaggedContentTest was added."
             )
         )
 
-    return _failed(
-        details="Document is not tagged; page content cannot be verified as tagged."
+    return _status_from_test(
+        result,
+        "TaggedContentTest",
+        details_field="UntaggedContentSummary",
     )
 
 

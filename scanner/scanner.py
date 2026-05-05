@@ -19,6 +19,7 @@ from scanner.checks.forms import check_forms, check_form_fields
 from scanner.checks.headings import check_headings
 from scanner.checks.lists import check_lists
 from scanner.checks.tables import check_tables
+from scanner.checks.tagged_content import check_tagged_content
 from scanner.image_detection import detect_image_objects
 from scanner.structure import load_structure_items
 
@@ -122,6 +123,7 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
 
         check_metadata_and_title(pdf, result)
         check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
         check_protection(pdf, result)
         check_language(pdf, result)
         check_forms(pdf, result)
