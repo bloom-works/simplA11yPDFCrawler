@@ -296,6 +296,7 @@ Example shape:
     "Failed manually": 0,
     "Skipped": 0,
     "Passed": 19,
+    "Warning": 0,
     "Failed": 0
   },
   "Detailed Report": {
@@ -313,6 +314,8 @@ Example shape:
 
 The structured report is intended for applications that want a more human-readable accessibility check, which matches the format of other industry-standard PDF accessibility reports.
 
+In the default report mode, scanner warnings are reported with `"Status": "Warning"`. This is used for issues that may require manual review but are not treated as definite failures by the scanner.
+
 #### PDF Accessibility Checker JSON Report: Compatible mode
 
 ```bash
@@ -324,6 +327,8 @@ Compatible mode includes additional rules that this scanner does not fully autom
 - Unsupported checks like "Tab order" and "Character encoding" are returned as `Skipped`.
 
 - Manual checks like "Logical Reading Order" and "Color contrast" are returned as `Needs manual check`.
+
+In compatible mode, scanner warnings are reported as `"Failed"` with `"Severity": "Warning"` when debug output is enabled. This preserves compatibility with report formats that do not have a separate warning status.
 
 This is useful if a consuming application expects the same report categories as other industry-standard PDF accessibility reports.
 
@@ -368,7 +373,7 @@ scanner/
 
   checks/
     document.py           # Check metadata, title, tagging, protection, language, bookmarks, text
-    tagged_content.py    # Page content stream checks for unmarked text
+    tagged_content.py     # Page content stream checks for unmarked text
     figures.py            # Figure and alternate text checks
     headings.py           # Heading hierarchy checks
     lists.py              # List structure checks

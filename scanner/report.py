@@ -5,6 +5,7 @@ from typing import Callable
 
 PASSED = "Passed"
 FAILED = "Failed"
+WARNING = "Warning"
 SKIPPED = "Skipped"
 NEEDS_MANUAL_CHECK = "Needs manual check"
 
@@ -27,8 +28,21 @@ class ReportRule:
     resolver: Callable[[dict, bool], dict]
     compatible_only: bool = False
 
-    def to_report_item(self, result: dict, debug: bool = False) -> dict:
+    def to_report_item(
+        self,
+        result: dict,
+        debug: bool = False,
+        warnings_as_failures: bool = False,
+    ) -> dict:
         outcome = self.resolver(result, debug)
+
+        if warnings_as_failures and outcome["Status"] == WARNING:
+            outcome = {
+                **outcome,
+                "Status": FAILED,
+                "Severity": WARNING,
+            }
+
         item = {
             "Rule": self.rule,
             "Status": outcome["Status"],
@@ -67,6 +81,22 @@ def _failed(
         outcome["Original status"] = original
     if severity is not None:
         outcome["Severity"] = severity
+    if details:
+        outcome["Details"] = details
+    if note:
+        outcome["Note"] = note
+    return outcome
+
+
+def _warning(
+    *,
+    original: str | None = None,
+    details: str | None = None,
+    note: str | None = None,
+) -> dict:
+    outcome = {"Status": WARNING}
+    if original is not None:
+        outcome["Original status"] = original
     if details:
         outcome["Details"] = details
     if note:
@@ -128,7 +158,7 @@ def _status_from_test(
     if raw == "Fail":
         return _failed(original=raw, details=details)
     if raw == "Warn":
-        return _failed(original=raw, severity="Warning", details=details)
+        return _warning(original=raw, details=details)
     if raw == "NotApplicable":
         if not_applicable_status == PASSED:
             return _passed(original=raw, details=details)
@@ -345,9 +375,8 @@ def _lbl_lbody_rule(result: dict, debug: bool = False) -> dict:
     details = _clean_parts(result.get("InvalidListChildren"), non_l_container_malformed)
     if details:
         if result.get("ListsTest") == "Warn":
-            return _failed(
+            return _warning(
                 original="Warn",
-                severity="Warning",
                 details=details,
             )
         return _failed(details=details)
@@ -365,7 +394,7 @@ def _headings_rule(result: dict, debug: bool = False) -> dict:
     heading_issues = result.get("HeadingIssues") or ""
 
     # Compatibility/report interpretation:
-    # Adobe's "Appropriate nesting" passes when there are no headings,
+    # "Appropriate nesting" passes when there are no headings,
     # because there is no invalid nesting to evaluate.
     if (
         heading_status == "Warn"
@@ -649,6 +678,7 @@ def _build_summary(detailed_report: dict[str, list[dict]]) -> dict:
         "Failed manually": 0,
         "Skipped": 0,
         "Passed": 0,
+        "Warning": 0,
         "Failed": 0,
     }
 
@@ -663,6 +693,8 @@ def _build_summary(detailed_report: dict[str, list[dict]]) -> dict:
             "The checker found problems which may prevent the document from "
             "being fully accessible."
         )
+    elif counts["Warning"] > 0:
+        description = "The checker found warnings which may require manual review."
     else:
         description = "The checker found no problems in this document."
 
@@ -691,7 +723,13 @@ def build_json_report(
         if rule.rule == "Open PDF" and not result.get("BrokenFile"):
             continue
 
-        detailed_report[rule.category].append(rule.to_report_item(result, debug=debug))
+        detailed_report[rule.category].append(
+            rule.to_report_item(
+                result,
+                debug=debug,
+                warnings_as_failures=compatible,
+            )
+        )
 
     return {
         "Summary": _build_summary(detailed_report),
