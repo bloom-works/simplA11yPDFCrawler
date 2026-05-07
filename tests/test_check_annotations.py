@@ -6,7 +6,6 @@ from scanner.checks.annotations import check_annotations
 from scanner.checks.document import check_tagging
 from scanner.structure import load_structure_items
 
-
 FIXTURE_SUBDIR = "annotations"
 
 
@@ -68,13 +67,15 @@ def test_check_annotations_fails_for_untagged_pdf_with_link_annotation(
     assert "annotations-untagged" in result["_log"]
 
 
-# Tagged PDF with a link annotation but no Link structure elements: warn
-def test_check_annotations_warns_for_tagged_pdf_with_link_annotation_but_no_link_structure(
+# Tagged PDF with a link annotation but no Link structure elements in the flat
+# structure walk: pass when the annotation is still connected through /StructParent
+# and /ParentTree.
+def test_check_annotations_passes_for_tagged_pdf_with_link_annotation_mapped_through_parent_tree(
     fixtures_dir: Path,
     make_result,
 ):
     pdf_path = (
-        fixtures_dir / FIXTURE_SUBDIR / "annotations_tagged_link_no_struct_warn.pdf"
+        fixtures_dir / FIXTURE_SUBDIR / "annotations_tagged_link_parent_tree_pass.pdf"
     )
 
     result = make_result(pdf_path.name)
@@ -87,9 +88,17 @@ def test_check_annotations_warns_for_tagged_pdf_with_link_annotation_but_no_link
     assert result["AnnotationCount"] >= 1
     assert result["AnnotationsFound"] is True
     assert result["LinkAnnotationCount"] >= 1
-    assert result["TaggedAnnotationsTest"] == "Warn"
+
+    # This fixture does not expose Link items through our StructureItem walk,
+    # but the annotation itself is properly connected through the ParentTree.
+    assert result["LinkStructureCount"] == 0
+    assert "struct_parent=1" in result["AnnotationSummary"]
+
+    assert result["TaggedAnnotationsTest"] == "Pass"
+    assert result["TaggedAnnotationIssues"] == ""
     assert result["Accessible"] is True
-    assert "annotations-tagging-warn" in result["_log"]
+    assert "annotations-tagging-warn" not in result["_log"]
+    assert "annotations-tagging-fail" not in result["_log"]
 
 
 # Tagged PDF with a link annotation and Link structure elements: pass
@@ -200,3 +209,34 @@ def test_check_annotations_detects_widget_annotation_in_tagged_pdf(
     assert result["LinkAnnotationCount"] == 0
     assert result["TaggedAnnotationsTest"] == "NotApplicable"
     assert result["Accessible"] is True
+
+
+# Tagged PDF with a link annotation missing /StructParent: fail because the
+# specific annotation is not connected to the structure tree through ParentTree.
+def test_check_annotations_fails_for_link_annotation_without_struct_parent(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "annotations_link_missing_struct_parent_fail.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items = build_annotation_inputs(pdf, result)
+        check_annotations(pdf, structure_items, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["AnnotationCount"] >= 1
+    assert result["AnnotationsFound"] is True
+    assert result["LinkAnnotationCount"] >= 1
+    assert result["LinkStructureCount"] >= 1
+
+    assert result["TaggedAnnotationsTest"] == "Fail"
+    assert "link annotation has no /StructParent" in result["TaggedAnnotationIssues"]
+    assert "Techniques/#pdf" in result["TaggedAnnotationIssues"]
+
+    assert result["Accessible"] is False
+    assert "annotations-tagging-fail" in result["_log"]

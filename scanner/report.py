@@ -243,7 +243,7 @@ def _tagged_annotations_rule(result: dict, debug: bool = False) -> dict:
     return _status_from_test(
         result,
         "TaggedAnnotationsTest",
-        details_field="AnnotationSummary",
+        details_field="TaggedAnnotationIssues",
     )
 
 

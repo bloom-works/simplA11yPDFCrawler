@@ -42,6 +42,7 @@ OUTPUT_FIELDS = [
     "LinkAnnotationCount",
     "WidgetAnnotationCount",
     "TaggedAnnotationsTest",
+    "TaggedAnnotationIssues",
     "AnnotationSummary",
     "LinkStructureCount",
     "ExternalLinkAnnotationCount",
