@@ -8,7 +8,6 @@ from typing import Any
 from scanner.models import StructureItem
 from scanner.structure import obj_get, safe_name
 
-
 FORM_STRUCT_TYPE = "Form"
 WIDGET_SUBTYPE = "/Widget"
 
@@ -35,6 +34,13 @@ class FormFieldInfo:
 def _object_ref(obj: Any) -> str | None:
     try:
         return repr(obj.objgen)
+    except Exception:
+        return None
+
+
+def _object_key(obj: Any) -> tuple[int, int] | None:
+    try:
+        return tuple(obj.objgen)
     except Exception:
         return None
 
@@ -119,11 +125,62 @@ def _collect_widget_annotations(field: Any) -> list[Any]:
     return widgets
 
 
+def _build_widget_page_map(pdf) -> dict[tuple[int, int], str]:
+    """
+    Map widget annotation objects to the page where they appear.
+
+    Some widget annotations do not have their own /P entry, but they are still
+    page-associated because they appear in a page's /Annots array. Adobe seems
+    to accept this as a valid association.
+    """
+    widget_page_map: dict[tuple[int, int], str] = {}
+
+    for page_index, page in enumerate(pdf.pages, start=1):
+        annots = obj_get(page.obj, "/Annots")
+        if annots is None:
+            continue
+
+        try:
+            for annot in annots:
+                if safe_name(obj_get(annot, "/Subtype")) != WIDGET_SUBTYPE:
+                    continue
+
+                key = _object_key(annot)
+                if key is None:
+                    continue
+
+                page_ref = _object_ref(page.obj) or f"page={page_index}"
+                widget_page_map[key] = page_ref
+        except Exception:
+            continue
+
+    return widget_page_map
+
+
 def _page_ref_from_widget(widget: Any) -> str | None:
     page = obj_get(widget, "/P")
     if page is None:
         return None
     return _object_ref(page)
+
+
+def _page_refs_from_widget(
+    widget: Any,
+    widget_page_map: dict[tuple[int, int], str],
+) -> list[str]:
+    page_refs: list[str] = []
+
+    direct_page_ref = _page_ref_from_widget(widget)
+    if direct_page_ref:
+        page_refs.append(direct_page_ref)
+
+    widget_key = _object_key(widget)
+    if widget_key is not None:
+        inferred_page_ref = widget_page_map.get(widget_key)
+        if inferred_page_ref and inferred_page_ref not in page_refs:
+            page_refs.append(inferred_page_ref)
+
+    return page_refs
 
 
 def iter_form_fields(pdf) -> list[FormFieldInfo]:
@@ -139,6 +196,8 @@ def iter_form_fields(pdf) -> list[FormFieldInfo]:
     if not fields:
         return []
 
+    widget_page_map = _build_widget_page_map(pdf)
+
     collected: list[FormFieldInfo] = []
 
     try:
@@ -152,9 +211,9 @@ def iter_form_fields(pdf) -> list[FormFieldInfo]:
 
             page_refs: list[str] = []
             for widget in widgets:
-                page_ref = _page_ref_from_widget(widget)
-                if page_ref and page_ref not in page_refs:
-                    page_refs.append(page_ref)
+                for page_ref in _page_refs_from_widget(widget, widget_page_map):
+                    if page_ref and page_ref not in page_refs:
+                        page_refs.append(page_ref)
 
             collected.append(
                 FormFieldInfo(

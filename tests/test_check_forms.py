@@ -6,7 +6,6 @@ from scanner.checks.forms import check_forms, check_form_fields
 from scanner.checks.document import check_tagging
 from scanner.structure import load_structure_items
 
-
 FIXTURE_SUBDIR = "forms"
 
 
@@ -241,3 +240,31 @@ def test_check_form_fields_passes_when_description_exists_on_widget_annotation(
     assert "desc_source=widget-tooltip" in result["FormFieldSummary"]
     assert result["TaggedFormFieldsTest"] == "Pass"
     assert result["Accessible"] is True
+
+
+# Tagged PDF with widget annotations missing /P: pass when the widgets can be
+# associated with pages through the page /Annots array.
+def test_check_form_fields_passes_when_widget_page_is_inferred_from_page_annots(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "forms_widget_missing_p_in_page_annots_pass.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_forms(pdf, result)
+        structure_items = build_form_inputs(pdf, result)
+        check_form_fields(pdf, structure_items, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["FormFieldCount"] >= 1
+    assert result["FormsTest"] == "Pass"
+    assert result["TaggedFormFieldsTest"] == "Pass"
+
+    assert result["UnclearFieldAssociations"] == ""
+    assert "pages=[]" not in result["FormFieldSummary"]
+
+    assert result["Accessible"] is True
+    assert "forms-tagging-warn" not in result["_log"]
