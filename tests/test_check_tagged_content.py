@@ -166,6 +166,34 @@ def test_tagged_content_check_fails_when_pdf_is_not_tagged(
     assert result["Accessible"] is False
 
 
+def test_tagged_content_check_warns_for_unmarked_whitespace_fixture(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "tagged_content_whitespace_only_warn.pdf"
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["TaggedContentTest"] == "Warn"
+
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedContentSummary"] == ""
+
+    assert result["UntaggedWhitespaceContentCount"] == 1
+    assert "page=1" in result["UntaggedWhitespaceContentSummary"]
+    assert "source=page" in result["UntaggedWhitespaceContentSummary"]
+    assert "op=Tj" in result["UntaggedWhitespaceContentSummary"]
+    assert "text=' '" in result["UntaggedWhitespaceContentSummary"]
+
+    assert result["Accessible"] is True
+    assert "tagged-content-whitespace-warn" in result["_log"]
+    assert "tagged-content-fail" not in result["_log"]
+
+
 #########################################################
 ################# NO-FIXTURE UNIT TESTS #################
 #########################################################
@@ -293,7 +321,7 @@ def test_tagged_content_check_passes_for_text_inside_artifact(
     assert "tagged-content-fail" not in result["_log"]
 
 
-def test_tagged_content_check_ignores_unmarked_whitespace_text(
+def test_tagged_content_check_warns_for_unmarked_whitespace_text(
     make_result,
     monkeypatch,
 ):
@@ -309,10 +337,16 @@ def test_tagged_content_check_ignores_unmarked_whitespace_text(
 
     check_tagged_content(pdf, result)
 
-    assert result["TaggedContentTest"] == "Pass"
+    assert result["TaggedContentTest"] == "Warn"
     assert result["UntaggedContentCount"] == 0
     assert result["UntaggedContentSummary"] == ""
+    assert result["UntaggedWhitespaceContentCount"] == 1
+    assert (
+        "page=1 source=page op=Tj text='   '"
+        in result["UntaggedWhitespaceContentSummary"]
+    )
     assert result["Accessible"] is True
+    assert "tagged-content-whitespace-warn" in result["_log"]
     assert "tagged-content-fail" not in result["_log"]
 
 

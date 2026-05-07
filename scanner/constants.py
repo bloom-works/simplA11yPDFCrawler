@@ -9,6 +9,8 @@ OUTPUT_FIELDS = [
     "TaggedContentTest",
     "UntaggedContentCount",
     "UntaggedContentSummary",
+    "UntaggedWhitespaceContentCount",
+    "UntaggedWhitespaceContentSummary",
     "EmptyTextTest",
     "ProtectedTest",
     "TitleTest",

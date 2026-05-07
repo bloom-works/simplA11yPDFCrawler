@@ -216,6 +216,16 @@ def _tagged_content_rule(result: dict, debug: bool = False) -> dict:
             )
         )
 
+    if raw == "Warn":
+        return _warning(
+            original=raw,
+            details=result.get("UntaggedWhitespaceContentSummary"),
+            note=(
+                "Only whitespace-only untagged text operations were found. "
+                "Adobe may report these as untagged content elements."
+            ),
+        )
+
     return _status_from_test(
         result,
         "TaggedContentTest",

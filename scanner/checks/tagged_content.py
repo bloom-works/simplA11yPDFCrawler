@@ -33,6 +33,7 @@ class UntaggedContentIssue:
     operator: str
     text: str
     source: str = "page"
+    whitespace_only: bool = False
 
 
 def _object_ref(obj: Any) -> str | None:
@@ -99,6 +100,10 @@ def _extract_text_from_text_showing_operator(
 
 def _has_meaningful_text(text: str) -> bool:
     return bool(text and text.strip())
+
+
+def _has_any_text(text: str) -> bool:
+    return text != ""
 
 
 def _resolve_xobject(
@@ -188,13 +193,14 @@ def _iter_untagged_text_in_content_stream(
 
             text = _extract_text_from_text_showing_operator(operator_name, operands)
 
-            if _has_meaningful_text(text):
+            if _has_any_text(text):
                 issues.append(
                     UntaggedContentIssue(
                         page_number=page_number,
                         operator=operator_name,
                         text=text,
                         source=source,
+                        whitespace_only=not _has_meaningful_text(text),
                     )
                 )
 
@@ -244,19 +250,7 @@ def iter_untagged_text_showing_operations(pdf) -> list[UntaggedContentIssue]:
     return issues
 
 
-def check_tagged_content(pdf, result: dict) -> None:
-    result["TaggedContentTest"] = "NotApplicable"
-    result["UntaggedContentCount"] = 0
-    result["UntaggedContentSummary"] = ""
-
-    if result.get("TaggedTest") != "Pass":
-        result["TaggedContentTest"] = "Fail"
-        return
-
-    issues = iter_untagged_text_showing_operations(pdf)
-
-    result["UntaggedContentCount"] = len(issues)
-
+def _format_issue_summary(issues: list[UntaggedContentIssue]) -> str:
     summary_parts = [
         (
             f"page={issue.page_number} "
@@ -270,11 +264,39 @@ def check_tagged_content(pdf, result: dict) -> None:
     if len(issues) > MAX_SUMMARY_ITEMS:
         summary_parts.append(f"... {len(issues) - MAX_SUMMARY_ITEMS} more")
 
-    result["UntaggedContentSummary"] = " | ".join(summary_parts)
+    return " | ".join(summary_parts)
 
-    if issues:
+
+def check_tagged_content(pdf, result: dict) -> None:
+    result["TaggedContentTest"] = "NotApplicable"
+    result["UntaggedContentCount"] = 0
+    result["UntaggedContentSummary"] = ""
+    result["UntaggedWhitespaceContentCount"] = 0
+    result["UntaggedWhitespaceContentSummary"] = ""
+
+    if result.get("TaggedTest") != "Pass":
+        result["TaggedContentTest"] = "Fail"
+        return
+
+    issues = iter_untagged_text_showing_operations(pdf)
+
+    meaningful_issues = [issue for issue in issues if not issue.whitespace_only]
+    whitespace_issues = [issue for issue in issues if issue.whitespace_only]
+
+    result["UntaggedContentCount"] = len(meaningful_issues)
+    result["UntaggedWhitespaceContentCount"] = len(whitespace_issues)
+
+    result["UntaggedContentSummary"] = _format_issue_summary(meaningful_issues)
+    result["UntaggedWhitespaceContentSummary"] = _format_issue_summary(
+        whitespace_issues
+    )
+
+    if meaningful_issues:
         result["TaggedContentTest"] = "Fail"
         result["Accessible"] = False
         result["_log"] += "tagged-content-fail, "
+    elif whitespace_issues:
+        result["TaggedContentTest"] = "Warn"
+        result["_log"] += "tagged-content-whitespace-warn, "
     else:
         result["TaggedContentTest"] = "Pass"
