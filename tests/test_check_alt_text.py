@@ -6,7 +6,6 @@ from scanner.checks.alt_text import check_nested_alt_text, check_hides_annotatio
 from scanner.checks.document import check_tagging
 from scanner.structure import load_structure_items
 
-
 FIXTURE_SUBDIR = "alt_text"
 
 
@@ -174,6 +173,43 @@ def test_hides_annotation_warns_for_form_with_alt_and_objr(
     assert result["TaggedTest"] == "Pass"
     assert result["HidesAnnotationTest"] == "Warn"
     assert result["HidesAnnotationIssues"] != ""
-    assert "Form has alt text and OBJR child" in result["HidesAnnotationIssues"]
+    assert "Form has /Alt and 1 OBJR child" in result["HidesAnnotationIssues"]
+    assert result["Accessible"] is True
+    assert "alt-hides-annotation-warn" in result["_log"]
+
+
+# Tagged PDF with a Form OBJR inside an alt-bearing ancestor: warn because
+# ancestor alternate text can hide the descendant form annotation.
+def test_hides_annotation_warns_for_form_objr_inside_alt_bearing_ancestor(
+    fixtures_dir: Path,
+    make_result,
+):
+    # The tag tree looks like this:
+    #
+    # Document / Part
+    #   Table   <-- has /Alt
+    #     TR
+    #       TD
+    #         Form   <-- has OBJR child for widget annotation
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "alt_text_form_inside_table_alt_hides_annotation_warn.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items = build_alt_text_inputs(pdf, result)
+        check_hides_annotation(structure_items, result)
+
+    print(result)
+    assert result["TaggedTest"] == "Pass"
+    assert result["HidesAnnotationTest"] == "Warn"
+    assert result["HidesAnnotationIssues"] != ""
+
+    assert "Form has" in result["HidesAnnotationIssues"]
+    assert "OBJR child inside Table" in result["HidesAnnotationIssues"]
+    assert "with /Alt" in result["HidesAnnotationIssues"]
+
     assert result["Accessible"] is True
     assert "alt-hides-annotation-warn" in result["_log"]

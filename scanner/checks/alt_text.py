@@ -79,7 +79,20 @@ def check_nested_alt_text(structure_items: list[StructureItem], result: dict) ->
         result["NestedAltTextTest"] = "Pass"
 
 
-def check_hides_annotation(structure_items, result):
+def check_hides_annotation(structure_items: list[StructureItem], result: dict) -> None:
+    """
+    Warn when form annotations may be hidden by alternate text.
+
+    Adobe flags "Hides annotation" when annotation-bearing structure content is
+    inside alternate text. The most common form case is either:
+
+    - a Form structure element has /Alt or /ActualText and an OBJR child
+    - a Form structure element has an OBJR child and an ancestor has /Alt or
+      /ActualText
+
+    We keep this as Warn rather than Fail because this is still a structural
+    approximation, even though Adobe reports it as a failure.
+    """
     SUSPICIOUS_TYPES = {
         "Form",
     }
@@ -90,13 +103,37 @@ def check_hides_annotation(structure_items, result):
     if result.get("TaggedTest") != "Pass":
         return
 
-    issues = []
+    issues: list[str] = []
 
-    for item in structure_items:
-        if item.normalized_type in SUSPICIOUS_TYPES and item.alt and item.has_objr:
+    for index, item in enumerate(structure_items):
+        if item.normalized_type not in SUSPICIOUS_TYPES:
+            continue
+
+        if not item.has_objr:
+            continue
+
+        ref = item.object_ref or "unknown-object"
+        objr_count = item.objr_count or 1
+
+        if item.alt:
+            source = item.alt_source or "alt text"
             issues.append(
-                f"{item.object_ref or 'unknown-object'}: "
-                f"{item.normalized_type} has alt text and OBJR child"
+                f"{ref}: {item.normalized_type} has {source} "
+                f"and {objr_count} OBJR child"
+            )
+            continue
+
+        ancestors = _ancestor_items(structure_items, index)
+        alt_ancestors = [ancestor for ancestor in ancestors if ancestor.alt]
+
+        if alt_ancestors:
+            nearest = alt_ancestors[0]
+            nearest_ref = nearest.object_ref or "unknown-object"
+            source = nearest.alt_source or "alt text"
+
+            issues.append(
+                f"{ref}: {item.normalized_type} has {objr_count} OBJR child "
+                f"inside {nearest.normalized_type} {nearest_ref} with {source}"
             )
 
     if not issues:
