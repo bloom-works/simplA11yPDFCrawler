@@ -38,7 +38,7 @@ The checker runs document-level tests, page-content tagging tests, structure-tre
 | Headings       | `HeadingsTest`          | Checks heading structure for skipped levels, plain `H` tags, first heading level and missing headings.                                                                                                                                |
 | Lists          | `ListsTest`             | Checks PDF list structure, including `L`, `LI`, `Lbl` and `LBody` relationships.                                                                                                                                                      |
 | Tables         | `TablesTest`            | Checks table structure, including `TR`, `TH`, `TD`, headers and table regularity.                                                                                                                                                     |
-| Tables         | row/column regularity   | Detects uneven row lengths, including basic `RowSpan` and `ColSpan` handling.                                                                                                                                                         |
+| Tables         | row/column regularity   | Warns about uneven row lengths, including basic `RowSpan` and `ColSpan` handling.                                                                                                                                                     |
 
 ### Known limitations
 
@@ -198,7 +198,7 @@ Fields include:
 | `InvalidTRParents`                 | `TR` elements with invalid parents.                                                                                                                                        |
 | `InvalidCellParents`               | `TH`/`TD` elements with invalid parents.                                                                                                                                   |
 | `TablesWithoutHeaders`             | Tables with no header cells.                                                                                                                                               |
-| `IrregularTables`                  | Tables with uneven row/column structure.                                                                                                                                   |
+| `IrregularTables`                  | Tables with uneven row/column structure that may require manual review.                                                                                                    |
 
 When `--debug` is used, additional debug fields may be included:
 

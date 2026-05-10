@@ -6,7 +6,6 @@ from scanner.checks.tables import check_tables
 from scanner.checks.document import check_tagging
 from scanner.structure import load_structure_items
 
-
 FIXTURE_SUBDIR = "tables"
 
 
@@ -534,10 +533,6 @@ def test_tables_check_passes_for_table_with_colspan_and_rowspan(
         structure_items = build_table_inputs(pdf, result)
         check_tables(structure_items, result)
 
-    print(result["_log"])
-    print("InvalidTRParents", result["InvalidTRParents"])
-    print("InvalidCellParents", result["InvalidCellParents"])
-    print("IrregularTables", result["IrregularTables"])
     assert result["TaggedTest"] == "Pass"
     assert result["TableCount"] >= 1
     assert result["TablesTest"] == "Pass"
@@ -548,12 +543,12 @@ def test_tables_check_passes_for_table_with_colspan_and_rowspan(
     assert result["IrregularTables"] == ""
 
 
-# Table with colspan / rowspan creating an actually irregular logical grid: fail
-def test_tables_check_fails_for_table_with_irregular_rowspans(
+# Table with colspan / rowspan creating an actually irregular logical grid: warn
+def test_tables_check_warns_for_table_with_irregular_rowspans(
     fixtures_dir: Path,
     make_result,
 ):
-    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "tables_rowspans_fail.pdf"
+    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "tables_rowspans_warn.pdf"
     result = make_result(pdf_path.name)
 
     with open_pdf(pdf_path) as pdf:
@@ -562,21 +557,21 @@ def test_tables_check_fails_for_table_with_irregular_rowspans(
 
     assert result["TaggedTest"] == "Pass"
     assert result["TableCount"] >= 1
-    assert result["TablesTest"] == "Fail"
-    assert result["Accessible"] is False
+    assert result["TablesTest"] == "Warn"
+    assert result["Accessible"] is True
     assert result["InvalidTRParents"] == ""
     assert result["InvalidCellParents"] == ""
     assert result["TablesWithoutHeaders"] == ""
     assert "Uneven row lengths detected" in result["IrregularTables"]
-    assert "tables-fail" in result["_log"]
+    assert "tables-warn" in result["_log"]
 
 
-# Table with a missing TD creating an irregular grid: fail
-def test_tables_check_fails_for_table_with_missing_td(
+# Table with a missing TD creating an irregular grid: warn
+def test_tables_check_warns_for_table_with_missing_td(
     fixtures_dir: Path,
     make_result,
 ):
-    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "tables_missing_td_fail.pdf"
+    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "tables_missing_td_warn.pdf"
     result = make_result(pdf_path.name)
 
     with open_pdf(pdf_path) as pdf:
@@ -585,10 +580,10 @@ def test_tables_check_fails_for_table_with_missing_td(
 
     assert result["TaggedTest"] == "Pass"
     assert result["TableCount"] >= 1
-    assert result["TablesTest"] == "Fail"
-    assert result["Accessible"] is False
+    assert result["TablesTest"] == "Warn"
+    assert result["Accessible"] is True
     assert result["InvalidTRParents"] == ""
     assert result["InvalidCellParents"] == ""
     assert result["TablesWithoutHeaders"] == ""
     assert "Uneven row lengths detected" in result["IrregularTables"]
-    assert "tables-fail" in result["_log"]
+    assert "tables-warn" in result["_log"]

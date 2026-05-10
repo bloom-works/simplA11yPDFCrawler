@@ -342,7 +342,14 @@ def _table_regularity_rule(result: dict, debug: bool = False) -> dict:
 
     details = result.get("IrregularTables")
     if details:
-        return _failed(details=details)
+        return _warning(
+            original="Warn",
+            details=details,
+            note=(
+                "Uneven row widths may indicate an irregular table, but this "
+                "cannot always be determined reliably from the tag tree alone."
+            ),
+        )
 
     return _passed()
 

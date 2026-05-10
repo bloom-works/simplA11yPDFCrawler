@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 from scanner.models import StructureItem
 
-
 TABLE = "Table"
 TABLE_ROW = "TR"
 TABLE_HEADER_CELL = "TH"
@@ -289,7 +288,7 @@ def check_tables(structure_items: list[StructureItem], result: dict) -> None:
     failures: list[str] = []
     warnings: list[str] = []
     header_failures: list[str] = []
-    irregular_failures: list[str] = []
+    irregular_warnings: list[str] = []
 
     # Global structural failures: TR parentage
     for item in rows:
@@ -360,12 +359,16 @@ def check_tables(structure_items: list[StructureItem], result: dict) -> None:
             if all(cell_type == TABLE_DATA_CELL for cell_type in table.all_cell_types):
                 header_failures.append(f"{table_ref}: Table cells are all TD")
 
-        # Regularity warning
+        # Regularity warning:
+        # an uneven logical grid may indicate a malformed table, but some
+        # Acrobat-repaired complex tables can expose the same pattern without
+        # explicit RowSpan / ColSpan metadata.
+        # eg: https://www.w3.org/WAI/WCAG22/Techniques/pdf/PDF20 (see working example PDF)
         effective_widths = [
             count for count in _effective_row_widths(table) if count > 0
         ]
         if len(effective_widths) >= 2 and len(set(effective_widths)) > 1:
-            irregular_failures.append(
+            irregular_warnings.append(
                 f"{table_ref}: Uneven row lengths detected ({effective_widths})"
             )
 
@@ -376,10 +379,10 @@ def check_tables(structure_items: list[StructureItem], result: dict) -> None:
         msg for msg in failures if " expected TR" in msg
     )
     result["TablesWithoutHeaders"] = " | ".join(header_failures)
-    result["IrregularTables"] = " | ".join(irregular_failures)
+    result["IrregularTables"] = " | ".join(irregular_warnings)
 
     failures.extend(header_failures)
-    failures.extend(irregular_failures)
+    warnings.extend(irregular_warnings)
 
     if failures:
         result["TablesTest"] = "Fail"
