@@ -36,6 +36,42 @@ class UntaggedContentIssue:
     whitespace_only: bool = False
 
 
+@dataclass(frozen=True)
+class MarkedContentScope:
+    tag: str | None
+    mcid: int | None = None
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _marked_content_scope(
+    operator_name: str,
+    operands: list[Any],
+) -> MarkedContentScope:
+    tag = _marked_content_tag(operands)
+    mcid = None
+
+    if operator_name == "BDC" and len(operands) > 1:
+        mcid = _int_or_none(obj_get(operands[1], "/MCID"))
+
+    return MarkedContentScope(tag=tag, mcid=mcid)
+
+
+def _is_inside_artifact_scope(stack: list[MarkedContentScope]) -> bool:
+    return any(scope.tag == "Artifact" for scope in stack)
+
+
+def _is_inside_structurally_tagged_scope(
+    stack: list[MarkedContentScope],
+) -> bool:
+    return any(scope.mcid is not None for scope in stack)
+
+
 def _object_ref(obj: Any) -> str | None:
     try:
         return repr(obj.objgen)
@@ -148,7 +184,7 @@ def _iter_untagged_text_in_content_stream(
     content: Any,
     *,
     page_number: int,
-    marked_content_stack: list[str | None],
+    marked_content_stack: list[MarkedContentScope],
     source: str,
     visited: set[str],
     depth: int = 0,
@@ -177,7 +213,7 @@ def _iter_untagged_text_in_content_stream(
         operator_name = _operator_name(operator)
 
         if operator_name in MARKED_CONTENT_START_OPERATORS:
-            stack.append(_marked_content_tag(operands))
+            stack.append(_marked_content_scope(operator_name, operands))
             continue
 
         if operator_name == MARKED_CONTENT_END_OPERATOR:
@@ -188,7 +224,9 @@ def _iter_untagged_text_in_content_stream(
         if operator_name in TEXT_SHOWING_OPERATORS:
             # Same rule as your current implementation:
             # any marked-content scope means we do not report this as naked text.
-            if stack:
+            if _is_inside_artifact_scope(stack) or _is_inside_structurally_tagged_scope(
+                stack
+            ):
                 continue
 
             text = _extract_text_from_text_showing_operator(operator_name, operands)

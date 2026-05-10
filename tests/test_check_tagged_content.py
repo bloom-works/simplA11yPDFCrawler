@@ -194,6 +194,27 @@ def test_tagged_content_check_warns_for_unmarked_whitespace_fixture(
     assert "tagged-content-fail" not in result["_log"]
 
 
+def test_tagged_content_warns_for_marked_whitespace_without_mcid(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "tagged_content_wcag_pdf2_bookmarks_warn.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["TaggedContentTest"] == "Warn"
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedWhitespaceContentCount"] == 5
+    assert result["Accessible"] is True
+    assert "tagged-content-whitespace-warn" in result["_log"]
+
+
 #########################################################
 ################# NO-FIXTURE UNIT TESTS #################
 #########################################################
@@ -271,7 +292,7 @@ def test_tagged_content_check_fails_for_unmarked_text_showing_operator(
     assert "tagged-content-fail" in result["_log"]
 
 
-def test_tagged_content_check_passes_for_text_inside_marked_content(
+def test_tagged_content_check_fails_for_text_inside_marked_content_without_mcid(
     make_result,
     monkeypatch,
 ):
@@ -280,6 +301,31 @@ def test_tagged_content_check_passes_for_text_inside_marked_content(
     pdf = fake_pdf_with_ops(
         [
             (["/P"], "BMC"),
+            (["Hello"], "Tj"),
+            ([], "EMC"),
+        ]
+    )
+    result = make_result("fake.pdf")
+    result["TaggedTest"] = "Pass"
+
+    check_tagged_content(pdf, result)
+
+    assert result["TaggedContentTest"] == "Fail"
+    assert result["UntaggedContentCount"] == 1
+    assert "text='Hello'" in result["UntaggedContentSummary"]
+    assert result["Accessible"] is False
+    assert "tagged-content-fail" in result["_log"]
+
+
+def test_tagged_content_check_passes_for_text_inside_marked_content_with_mcid(
+    make_result,
+    monkeypatch,
+):
+    patch_parse_content_stream(monkeypatch)
+
+    pdf = fake_pdf_with_ops(
+        [
+            (["/P", {"/MCID": 0}], "BDC"),
             (["Hello"], "Tj"),
             ([], "EMC"),
         ]
