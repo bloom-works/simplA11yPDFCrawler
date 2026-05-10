@@ -566,6 +566,37 @@ def test_tables_check_warns_for_table_with_irregular_rowspans(
     assert "tables-warn" in result["_log"]
 
 
+# WCAG PDF20 repaired complex-table example:
+# Acrobat passes this table, but the tag tree exposes row widths of
+# [5, 6, 6, 6, 6, 6] because the visible merged-cell relationships are not
+# represented with explicit RowSpan / ColSpan attributes.
+# We warn on the structural irregularity rather than treating it as a definite failure.
+def test_tables_check_warns_for_wcag_repaired_complex_table_example(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "tables_wcag_pdf20_complex_table_warn.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items = build_table_inputs(pdf, result)
+        check_tables(structure_items, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["TableCount"] == 1
+    assert result["TablesTest"] == "Warn"
+    assert result["Accessible"] is True
+    assert result["InvalidTRParents"] == ""
+    assert result["InvalidCellParents"] == ""
+    assert result["TablesWithoutHeaders"] == ""
+    assert (
+        "Uneven row lengths detected ([5, 6, 6, 6, 6, 6])" in result["IrregularTables"]
+    )
+    assert "tables-warn" in result["_log"]
+
+
 # Table with a missing TD creating an irregular grid: warn
 def test_tables_check_warns_for_table_with_missing_td(
     fixtures_dir: Path,
