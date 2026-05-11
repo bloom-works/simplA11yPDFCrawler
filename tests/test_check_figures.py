@@ -7,7 +7,6 @@ from scanner.checks.document import check_tagging
 from scanner.image_detection import detect_image_objects
 from scanner.structure import load_structure_items
 
-
 FIXTURE_SUBDIR = "figures"
 
 
@@ -43,6 +42,8 @@ def test_figures_check_passes_for_tagged_pdf_with_no_figures(
     assert result["FiguresWithAlt"] == 0
     assert result["FiguresWithActualTextOnly"] == 0
     assert result["FiguresWithoutAlt"] == 0
+    assert result["FiguresWithEmptyAlt"] == 0
+    assert result["FiguresAltTextIssues"] == ""
 
 
 def test_figures_check_passes_for_tagged_pdf_with_figure_alt_text(
@@ -62,6 +63,8 @@ def test_figures_check_passes_for_tagged_pdf_with_figure_alt_text(
     assert result["FiguresWithActualTextOnly"] == 0
     assert result["FiguresWithoutAlt"] == 0
     assert result["FiguresAltTextTest"] == "Pass"
+    assert result["FiguresWithEmptyAlt"] == 0
+    assert result["FiguresAltTextIssues"] == ""
 
 
 def test_figures_check_warns_for_tagged_pdf_with_actualtext_only(
@@ -78,8 +81,10 @@ def test_figures_check_warns_for_tagged_pdf_with_actualtext_only(
     assert result["TaggedTest"] == "Pass"
     assert result["FiguresFound"] == 1
     assert result["FiguresWithActualTextOnly"] == 1
-    assert result["FiguresWithoutAlt"] == 0
+    assert result["FiguresWithoutAlt"] == 1
     assert result["FiguresAltTextTest"] == "Warn"
+    assert result["FiguresWithEmptyAlt"] == 0
+    assert "uses /ActualText" in result["FiguresAltTextIssues"]
     assert "figures-actualtext" in result["_log"]
 
 
@@ -98,6 +103,31 @@ def test_figures_check_fails_for_tagged_pdf_with_figure_missing_alt_text(
     assert result["FiguresFound"] == 1
     assert result["FiguresWithoutAlt"] == 1
     assert result["FiguresAltTextTest"] == "Fail"
+    assert result["Accessible"] is False
+    assert result["FiguresWithEmptyAlt"] == 0
+    assert "no /Alt or /ActualText" in result["FiguresAltTextIssues"]
+    assert "figures-alt" in result["_log"]
+
+
+def test_figures_check_fails_for_tagged_pdf_with_empty_alt_text(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "figures_tagged_empty_alt_fail.pdf"
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items, image_info = build_figure_inputs(pdf, result)
+        check_figures(structure_items, result, image_info=image_info)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["FiguresFound"] == 1
+    assert result["FiguresWithAlt"] == 0
+    assert result["FiguresWithEmptyAlt"] == 1
+    assert result["FiguresWithActualTextOnly"] == 0
+    assert result["FiguresWithoutAlt"] == 0
+    assert result["FiguresAltTextTest"] == "Fail"
+    assert "empty /Alt" in result["FiguresAltTextIssues"]
     assert result["Accessible"] is False
     assert "figures-alt" in result["_log"]
 

@@ -572,7 +572,7 @@ REPORT_RULES = [
         "Figures require alternate text",
         _structure_dependent_test(
             "FiguresAltTextTest",
-            details_field="FiguresWithoutAlt",
+            details_field="FiguresAltTextIssues",
         ),
     ),
     ReportRule(

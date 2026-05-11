@@ -16,6 +16,7 @@ def base_result():
         "TaggedFormFieldsTest": "NotApplicable",
         "FormsTest": "NotApplicable",
         "FiguresAltTextTest": "Pass",
+        "FiguresAltTextIssues": "",
         "NestedAltTextTest": "NotApplicable",
         "HidesAnnotationTest": "NotApplicable",
         "InvalidTRParents": "",
@@ -145,4 +146,26 @@ def test_report_marks_tagged_content_failed_when_document_is_not_tagged_debug():
     assert tagged_content["Status"] == "Failed"
     assert tagged_content["Details"] == (
         "Document is not tagged; page content cannot be verified as tagged."
+    )
+
+
+def test_report_includes_figure_alt_text_issue_details_debug():
+    result = {
+        **base_result(),
+        "FiguresAltTextTest": "Fail",
+        "FiguresAltTextIssues": "(28, 0): Figure has empty /Alt and no usable /ActualText",
+    }
+
+    report = build_json_report(result, debug=True)
+
+    figures_alt_text = find_rule(
+        report,
+        "Alternate Text",
+        "Figures alternate text",
+    )
+
+    assert figures_alt_text["Status"] == "Failed"
+    assert figures_alt_text["Original status"] == "Fail"
+    assert figures_alt_text["Details"] == (
+        "(28, 0): Figure has empty /Alt and no usable /ActualText"
     )

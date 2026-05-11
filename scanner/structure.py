@@ -197,18 +197,37 @@ def normalize_struct_type(raw_type: Any, role_map: dict[str, str]) -> str | None
     return role_map.get(value, value)
 
 
-def find_alt_text(struct_elem: Any) -> tuple[str | None, str | None]:
+def find_alt_text(
+    struct_elem: Any,
+) -> tuple[str | None, str | None, bool, bool]:
     """
-    Try the most likely alt-text-related fields for a structure element.
-    Return (text, source) where source is '/Alt' or '/ActualText'.
+    Return the best usable alt-text-like value and preserve whether the raw
+    /Alt and /ActualText entries are present at all.
+
+    The returned tuple is:
+    - text: first non-empty usable value from /Alt, then /ActualText
+    - source: '/Alt' or '/ActualText' for that usable value
+    - has_alt_entry: whether the raw /Alt key exists, even if empty
+    - has_actual_text_entry: whether the raw /ActualText key exists, even if empty
     """
-    for key in ("/Alt", "/ActualText"):
-        value = obj_get(struct_elem, key)
-        if value is not None:
-            text = safe_name(value)
-            if text and text.strip():
-                return text.strip(), key
-    return None, None
+    alt_value = obj_get(struct_elem, "/Alt")
+    actual_text_value = obj_get(struct_elem, "/ActualText")
+
+    has_alt_entry = alt_value is not None
+    has_actual_text_entry = actual_text_value is not None
+
+    for value, source in (
+        (alt_value, "/Alt"),
+        (actual_text_value, "/ActualText"),
+    ):
+        if value is None:
+            continue
+
+        text = safe_name(value)
+        if text and text.strip():
+            return text.strip(), source, has_alt_entry, has_actual_text_entry
+
+    return None, None, has_alt_entry, has_actual_text_entry
 
 
 def iter_structure_elements(node: Any) -> list[Any]:
@@ -258,7 +277,7 @@ def build_structure_item(
         raw_type = raw_type[1:]
 
     title = safe_name(obj_get(node, "/T"))
-    alt_text, alt_source = find_alt_text(node)
+    alt_text, alt_source, has_alt_entry, has_actual_text_entry = find_alt_text(node)
     kids = as_kids(obj_get(node, "/K"))
     kids_count = len(kids)
 
@@ -292,6 +311,8 @@ def build_structure_item(
         kids_count=kids_count,
         object_ref=object_ref,
         alt_source=alt_source,
+        has_alt_entry=has_alt_entry,
+        has_actual_text_entry=has_actual_text_entry,
         parent_type=parent_type,
         ancestor_types=normalized_ancestors,
         child_types=child_types,

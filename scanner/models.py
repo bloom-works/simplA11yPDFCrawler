@@ -11,6 +11,8 @@ class StructureItem:
     kids_count: int
     object_ref: str | None = None
     alt_source: str | None = None
+    has_alt_entry: bool = False
+    has_actual_text_entry: bool = False
     parent_type: str | None = None
     ancestor_types: list[str] = field(default_factory=list)
     child_types: list[str] = field(default_factory=list)
