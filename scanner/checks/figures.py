@@ -5,16 +5,17 @@ def check_figures(
     structure_items: list[StructureItem],
     result: dict,
     image_info: dict[str, int] | None = None,
+    image_backed_mcids: set[tuple[str, int]] | None = None,
 ) -> None:
     """
     Inspect normalized structure items and report basic figure/alt-text findings.
 
     Tagged PDF rules:
-    - Pass: every Figure has non-empty /Alt
-    - Warn: no Figure is missing usable alternate text, but at least one Figure
-      relies on /ActualText instead of non-empty /Alt
-    - Fail: at least one Figure has no usable alternate text in either /Alt
-      or /ActualText
+    - Pass: every Figure has non-empty /Alt, or has explicit empty /Alt and is
+      known not to be image-backed
+    - Warn: no failing figures, but at least one Figure relies only on /ActualText
+    - Fail: at least one Figure has no usable alternate text and is either
+      image-backed or cannot be proven to be non-image content
 
     Diagnostic counts:
     - FiguresWithAlt: figures with non-empty /Alt
@@ -68,6 +69,12 @@ def check_figures(
         has_usable_actual_text = fig.alt_source == "/ActualText"
         has_empty_alt = fig.has_alt_entry and not has_usable_alt
 
+        is_image_backed: bool | None = None
+        if image_backed_mcids is not None and fig.page_ref and fig.mcids:
+            is_image_backed = any(
+                (fig.page_ref, mcid) in image_backed_mcids for mcid in fig.mcids
+            )
+
         if has_usable_alt:
             result["FiguresWithAlt"] += 1
 
@@ -83,9 +90,16 @@ def check_figures(
                 f"{ref}: Figure uses /ActualText but has no non-empty /Alt"
             )
 
-        # At this stage, preserve the existing scanner rule:
-        # no usable text in either /Alt or /ActualText is still a failure.
         if not fig.alt:
+            # Adobe-aligned behavior observed in the CT experiments:
+            # - an image-backed Figure with empty /Alt fails
+            # - a non-image Figure with explicit empty /Alt passes
+            #
+            # If we cannot prove that the Figure is non-image content, keep the
+            # stricter existing behavior and fail it.
+            if fig.has_alt_entry and is_image_backed is False:
+                continue
+
             if fig.has_alt_entry:
                 failing_issues.append(
                     f"{ref}: Figure has empty /Alt and no usable /ActualText"

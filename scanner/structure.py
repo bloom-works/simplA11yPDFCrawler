@@ -93,6 +93,69 @@ def as_attribute_list(value: Any) -> list[Any]:
     return [value]
 
 
+def get_object_ref(obj: Any) -> str | None:
+    """Return a stable indirect-object reference string such as '(12, 0)'."""
+    try:
+        return repr(obj.objgen)
+    except Exception:
+        return None
+
+
+def extract_mcids(node: Any) -> list[int]:
+    """
+    Extract direct MCIDs associated with a structure element.
+
+    Handles the two simple cases needed for now:
+    - /K is an integer MCID
+    - /K contains an MCR dictionary with /MCID
+    """
+    mcids: list[int] = []
+
+    for kid in as_kids(obj_get(node, "/K")):
+        try:
+            if isinstance(kid, int):
+                mcids.append(kid)
+                continue
+        except Exception:
+            pass
+
+        if safe_name(obj_get(kid, "/Type")) == "/MCR":
+            mcid = obj_get(kid, "/MCID")
+            try:
+                mcids.append(int(mcid))
+            except Exception:
+                pass
+
+    return mcids
+
+
+def extract_page_ref(
+    node: Any,
+    inherited_page_ref: str | None = None,
+) -> str | None:
+    """
+    Return the page associated with a structure element, if available.
+
+    Prefer:
+    1. the element's own /Pg
+    2. a direct MCR child's /Pg
+    3. the inherited page from an ancestor
+    """
+    page = obj_get(node, "/Pg")
+    if page is not None:
+        return get_object_ref(page)
+
+    for kid in as_kids(obj_get(node, "/K")):
+        if safe_name(obj_get(kid, "/Type")) != "/MCR":
+            continue
+
+        page = obj_get(kid, "/Pg")
+        if page is not None:
+            return get_object_ref(page)
+
+    return inherited_page_ref
+
+
 def extract_structure_attributes(node: Any) -> dict[str, object]:
     """
     Extract normalized structure attributes we care about.
@@ -268,6 +331,7 @@ def build_structure_item(
     depth: int,
     parent_type: str | None = None,
     ancestor_types: list[str] | None = None,
+    page_ref: str | None = None,
 ) -> StructureItem | None:
     """Convert a raw structure node into a normalized StructureItem."""
     raw_type = safe_name(obj_get(node, "/S"))
@@ -283,11 +347,10 @@ def build_structure_item(
 
     has_objr, objr_count, kid_object_types = extract_kid_object_info(node)
 
-    object_ref: str | None = None
-    try:
-        object_ref = repr(node.objgen)
-    except Exception:
-        object_ref = None
+    mcids = extract_mcids(node)
+    resolved_page_ref = extract_page_ref(node, page_ref)
+
+    object_ref = get_object_ref(node)
 
     if raw_type is None and normalized_type is None:
         return None
@@ -313,6 +376,8 @@ def build_structure_item(
         alt_source=alt_source,
         has_alt_entry=has_alt_entry,
         has_actual_text_entry=has_actual_text_entry,
+        mcids=mcids,
+        page_ref=resolved_page_ref,
         parent_type=parent_type,
         ancestor_types=normalized_ancestors,
         child_types=child_types,
@@ -329,6 +394,7 @@ def walk_structure_tree(
     depth: int = 0,
     parent_type: str | None = None,
     ancestor_types: list[str] | None = None,
+    page_ref: str | None = None,
 ) -> list[StructureItem]:
     """
     Recursively walk structure elements and collect a flat list of normalized
@@ -342,13 +408,16 @@ def walk_structure_tree(
         depth,
         parent_type=parent_type,
         ancestor_types=ancestor_types,
+        page_ref=page_ref,
     )
+
     if item is None:
         return results
 
     results.append(item)
 
     next_ancestors = [*(ancestor_types or []), item.normalized_type or ""]
+    next_page_ref = item.page_ref
 
     for child in iter_structure_elements(node):
         results.extend(
@@ -358,6 +427,7 @@ def walk_structure_tree(
                 depth + 1,
                 parent_type=item.normalized_type,
                 ancestor_types=next_ancestors,
+                page_ref=next_page_ref,
             )
         )
 

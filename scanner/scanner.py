@@ -21,6 +21,7 @@ from scanner.checks.lists import check_lists
 from scanner.checks.tables import check_tables
 from scanner.checks.tagged_content import check_tagged_content
 from scanner.image_detection import detect_image_objects
+from scanner.figure_content import detect_image_backed_mcids
 from scanner.structure import load_structure_items
 
 
@@ -120,6 +121,7 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
             structure_items = load_structure_items(pdf)
 
         image_info = detect_image_objects(pdf)
+        image_backed_mcids = detect_image_backed_mcids(pdf)
 
         check_metadata_and_title(pdf, result)
         check_tagging(pdf, result)
@@ -130,7 +132,12 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
         check_bookmarks(pdf, result)
         check_empty_text(pdf, result)
 
-        check_figures(structure_items, result, image_info=image_info)
+        check_figures(
+            structure_items,
+            result,
+            image_info=image_info,
+            image_backed_mcids=image_backed_mcids,
+        )
         check_nested_alt_text(structure_items, result)
         check_hides_annotation(structure_items, result)
         check_headings(structure_items, result)
