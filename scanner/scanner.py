@@ -75,13 +75,17 @@ def finalize_result(result):
         result["TotallyInaccessible"] = True
 
 
-def _debug_structure(pdf):
+def format_structure_debug(pdf, limit: int = 50) -> str:
     structure_items = load_structure_items(pdf)
-    print(f"Tagged PDF: {'yes' if structure_items else 'no'}")
-    print("First 50 structure items:")
-    for item in structure_items[:50]:
-        print(item)
-    print()
+
+    lines = [
+        f"Tagged PDF: {'yes' if structure_items else 'no'}",
+        f"First {limit} structure items:",
+    ]
+
+    lines.extend(str(item) for item in structure_items[:limit])
+
+    return "\n".join(lines)
 
 
 def check_file(file_name: str, site: str = None, debug: bool = False):
@@ -112,9 +116,6 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
         pdf = Pdf.open(file_name)
         result["PDFVersion"] = pdf.pdf_version
         result["Pages"] = len(pdf.pages)
-
-        if debug:
-            _debug_structure(pdf)
 
         structure_items = []
         if pdf.Root.get("/StructTreeRoot") is not None:
