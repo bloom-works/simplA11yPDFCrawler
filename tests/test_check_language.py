@@ -57,3 +57,19 @@ def test_language_check_fails_when_language_is_invalid(
     assert result["InvalidLang"] is True
     assert result["Accessible"] is False
     assert "Default language is not valid" in result["_log"]
+
+
+def test_language_fails_when_catalog_lang_is_empty_even_if_structure_lang_exists(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = fixtures_dir / "language" / "language_empty_catalog_structure_lang.pdf"
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_language(pdf, result)
+
+    assert result["LanguageTest"] == "Fail"
+    assert result["hasLang"] is False
+    assert result["Accessible"] is False
+    assert "lang" in result["_log"]
