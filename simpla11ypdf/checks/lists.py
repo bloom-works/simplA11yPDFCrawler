@@ -1,5 +1,4 @@
-from scanner.models import StructureItem
-
+from simpla11ypdf.models import StructureItem
 
 LIST_CONTAINER = "L"
 LIST_ITEM = "LI"

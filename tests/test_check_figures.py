@@ -2,14 +2,14 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.figures import check_figures
-from scanner.checks.document import check_tagging
-from scanner.figure_content import (
+from simpla11ypdf.checks.figures import check_figures
+from simpla11ypdf.checks.document import check_tagging
+from simpla11ypdf.figure_content import (
     collect_empty_alt_figure_mcids,
     detect_image_backed_mcids,
 )
-from scanner.image_detection import detect_image_objects
-from scanner.structure import load_structure_items
+from simpla11ypdf.image_detection import detect_image_objects
+from simpla11ypdf.structure import load_structure_items
 
 FIXTURE_SUBDIR = "figures"
 

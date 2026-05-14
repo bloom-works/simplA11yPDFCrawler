@@ -342,7 +342,7 @@ This is useful if a consuming application expects the same report categories as 
 The scanner can also be imported and used directly in Python.
 
 ```python
-from scanner.scanner import check_file
+from simpla11ypdf.scanner import check_file
 
 result = check_file("path/to/file.pdf")
 print(result["Accessible"])
@@ -352,8 +352,8 @@ print(result["TaggedTest"])
 To produce structured report JSON from Python:
 
 ```python
-from scanner.scanner import check_file
-from scanner.report import build_json_report
+from simpla11ypdf.scanner import check_file
+from simpla11ypdf.report import build_json_report
 
 result = check_file("path/to/file.pdf")
 report = build_json_report(result, compatible=False)
@@ -366,7 +366,7 @@ print(report["Summary"])
 The PDF scanner is split into small modules:
 
 ```text
-scanner/
+simpla11ypdf/
   scanner.py              # Orchestrates all checks for one PDF
   constants.py            # Output field definitions
   dates.py                # Date parsing helpers

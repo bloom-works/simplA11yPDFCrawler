@@ -6,9 +6,9 @@ import typer
 
 from pikepdf import Pdf
 
-from scanner.constants import OUTPUT_FIELDS
-from scanner.report import build_json_report
-from scanner.scanner import check_file, format_structure_debug
+from simpla11ypdf.constants import OUTPUT_FIELDS
+from simpla11ypdf.report import build_json_report
+from simpla11ypdf.scanner import check_file, format_structure_debug
 
 DEBUG_ONLY_FIELDS = ["_log", "fonts", "numTxtObjects"]
 

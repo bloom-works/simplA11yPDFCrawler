@@ -2,9 +2,9 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.annotations import check_annotations
-from scanner.checks.document import check_tagging
-from scanner.structure import load_structure_items
+from simpla11ypdf.checks.annotations import check_annotations
+from simpla11ypdf.checks.document import check_tagging
+from simpla11ypdf.structure import load_structure_items
 
 FIXTURE_SUBDIR = "annotations"
 

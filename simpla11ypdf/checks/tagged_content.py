@@ -6,7 +6,7 @@ from typing import Any
 
 import pikepdf
 
-from scanner.structure import obj_get, safe_name
+from simpla11ypdf.structure import obj_get, safe_name
 
 # Text-showing operators only. This intentionally does not yet flag
 # unmarked vector drawing, images, shadings, or other painted content.

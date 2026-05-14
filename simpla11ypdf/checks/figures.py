@@ -1,4 +1,4 @@
-from scanner.models import StructureItem
+from simpla11ypdf.models import StructureItem
 
 
 def check_figures(

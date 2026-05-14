@@ -1,4 +1,4 @@
-from scanner.report import build_json_report
+from simpla11ypdf.report import build_json_report
 
 
 def base_result():

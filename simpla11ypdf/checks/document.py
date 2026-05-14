@@ -2,9 +2,9 @@ from datetime import datetime
 from bitstring import BitArray
 from langcodes import Language, tag_parser
 
-from scanner.constants import DEADLINE_DATE_STR
-from scanner.dates import extract_date, extract_pdf_date
-from scanner.text_analysis import analyse_content, init_analysis, merge_analyses
+from simpla11ypdf.constants import DEADLINE_DATE_STR
+from simpla11ypdf.dates import extract_date, extract_pdf_date
+from simpla11ypdf.text_analysis import analyse_content, init_analysis, merge_analyses
 
 
 def check_bookmarks(pdf, result):

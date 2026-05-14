@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from scanner.models import StructureItem
+from simpla11ypdf.models import StructureItem
 
 TABLE = "Table"
 TABLE_ROW = "TR"

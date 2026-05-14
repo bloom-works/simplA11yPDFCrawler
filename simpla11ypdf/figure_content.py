@@ -4,8 +4,8 @@ from typing import Any
 
 import pikepdf
 
-from scanner.models import StructureItem
-from scanner.structure import obj_get, safe_name
+from simpla11ypdf.models import StructureItem
+from simpla11ypdf.structure import obj_get, safe_name
 
 
 def _object_ref(obj: Any) -> str | None:

@@ -2,8 +2,8 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.document import check_tagging
-from scanner.checks.tagged_content import check_tagged_content
+from simpla11ypdf.checks.document import check_tagging
+from simpla11ypdf.checks.tagged_content import check_tagged_content
 
 FIXTURE_SUBDIR = "tagged_content"
 
@@ -261,7 +261,7 @@ def patch_parse_content_stream(monkeypatch):
         return content.operations
 
     monkeypatch.setattr(
-        "scanner.checks.tagged_content.pikepdf.parse_content_stream",
+        "simpla11ypdf.checks.tagged_content.pikepdf.parse_content_stream",
         fake_parse_content_stream,
     )
 

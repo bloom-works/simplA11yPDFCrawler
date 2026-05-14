@@ -6,8 +6,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 import pytest
 
-from scanner.scanner import init_result
-
+from simpla11ypdf.scanner import init_result
 
 TESTS_DIR = Path(__file__).resolve().parent
 FIXTURES_DIR = TESTS_DIR / "fixtures"

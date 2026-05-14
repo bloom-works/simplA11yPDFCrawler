@@ -2,8 +2,7 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.document import check_metadata_and_title
-
+from simpla11ypdf.checks.document import check_metadata_and_title
 
 FIXTURE_SUBDIR = "title"
 

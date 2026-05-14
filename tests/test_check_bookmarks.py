@@ -2,8 +2,7 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.document import check_bookmarks
-
+from simpla11ypdf.checks.document import check_bookmarks
 
 FIXTURE_SUBDIR = "bookmarks"
 

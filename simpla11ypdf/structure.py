@@ -4,7 +4,7 @@ from typing import Any
 
 import pikepdf
 
-from scanner.models import StructureItem
+from simpla11ypdf.models import StructureItem
 
 
 def safe_name(obj: Any) -> str | None:

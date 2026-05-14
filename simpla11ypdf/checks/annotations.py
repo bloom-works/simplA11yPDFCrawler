@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from scanner.models import StructureItem
-from scanner.structure import (
+from simpla11ypdf.models import StructureItem
+from simpla11ypdf.structure import (
     as_kids,
     extract_role_map,
     normalize_struct_type,

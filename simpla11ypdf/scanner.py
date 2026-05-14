@@ -3,8 +3,8 @@ import os
 import pikepdf
 from pikepdf import Pdf
 
-from scanner.constants import OUTPUT_FIELDS
-from scanner.checks.document import (
+from simpla11ypdf.constants import OUTPUT_FIELDS
+from simpla11ypdf.checks.document import (
     check_bookmarks,
     check_empty_text,
     check_language,
@@ -12,20 +12,20 @@ from scanner.checks.document import (
     check_protection,
     check_tagging,
 )
-from scanner.checks.alt_text import check_nested_alt_text, check_hides_annotation
-from scanner.checks.annotations import check_annotations
-from scanner.checks.figures import check_figures
-from scanner.checks.forms import check_forms, check_form_fields
-from scanner.checks.headings import check_headings
-from scanner.checks.lists import check_lists
-from scanner.checks.tables import check_tables
-from scanner.checks.tagged_content import check_tagged_content
-from scanner.image_detection import detect_image_objects
-from scanner.figure_content import (
+from simpla11ypdf.checks.alt_text import check_nested_alt_text, check_hides_annotation
+from simpla11ypdf.checks.annotations import check_annotations
+from simpla11ypdf.checks.figures import check_figures
+from simpla11ypdf.checks.forms import check_forms, check_form_fields
+from simpla11ypdf.checks.headings import check_headings
+from simpla11ypdf.checks.lists import check_lists
+from simpla11ypdf.checks.tables import check_tables
+from simpla11ypdf.checks.tagged_content import check_tagged_content
+from simpla11ypdf.image_detection import detect_image_objects
+from simpla11ypdf.figure_content import (
     collect_empty_alt_figure_mcids,
     detect_image_backed_mcids,
 )
-from scanner.structure import load_structure_items
+from simpla11ypdf.structure import load_structure_items
 
 
 def init_result(file_name: str, site: str = None):

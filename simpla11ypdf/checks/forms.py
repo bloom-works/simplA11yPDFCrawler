@@ -5,8 +5,8 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any
 
-from scanner.models import StructureItem
-from scanner.structure import obj_get, safe_name
+from simpla11ypdf.models import StructureItem
+from simpla11ypdf.structure import obj_get, safe_name
 
 FORM_STRUCT_TYPE = "Form"
 WIDGET_SUBTYPE = "/Widget"

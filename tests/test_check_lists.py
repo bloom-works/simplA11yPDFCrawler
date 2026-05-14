@@ -2,10 +2,9 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.lists import check_lists
-from scanner.checks.document import check_tagging
-from scanner.structure import load_structure_items
-
+from simpla11ypdf.checks.lists import check_lists
+from simpla11ypdf.checks.document import check_tagging
+from simpla11ypdf.structure import load_structure_items
 
 FIXTURE_SUBDIR = "lists"
 

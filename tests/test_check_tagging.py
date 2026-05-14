@@ -2,8 +2,7 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.document import check_tagging
-
+from simpla11ypdf.checks.document import check_tagging
 
 FIXTURE_SUBDIR = "tagging"
 

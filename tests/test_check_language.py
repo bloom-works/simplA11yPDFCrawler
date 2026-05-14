@@ -2,8 +2,7 @@ from pathlib import Path
 
 from pikepdf import Pdf
 
-from scanner.checks.document import check_language
-
+from simpla11ypdf.checks.document import check_language
 
 FIXTURE_SUBDIR = "language"
 
