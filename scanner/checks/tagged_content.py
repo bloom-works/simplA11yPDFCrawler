@@ -27,7 +27,7 @@ MAX_SUMMARY_ITEMS = 50
 MAX_XOBJECT_DEPTH = 10
 
 
-@dataclass
+@dataclass(slots=True)
 class UntaggedContentIssue:
     page_number: int
     operator: str
@@ -36,7 +36,7 @@ class UntaggedContentIssue:
     whitespace_only: bool = False
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MarkedContentScope:
     tag: str | None
     mcid: int | None = None

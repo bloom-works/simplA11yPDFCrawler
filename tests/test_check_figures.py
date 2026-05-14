@@ -4,7 +4,10 @@ from pikepdf import Pdf
 
 from scanner.checks.figures import check_figures
 from scanner.checks.document import check_tagging
-from scanner.figure_content import detect_image_backed_mcids
+from scanner.figure_content import (
+    collect_empty_alt_figure_mcids,
+    detect_image_backed_mcids,
+)
 from scanner.image_detection import detect_image_objects
 from scanner.structure import load_structure_items
 
@@ -23,7 +26,12 @@ def build_figure_inputs(pdf: Pdf, result: dict):
         structure_items = load_structure_items(pdf)
 
     image_info = detect_image_objects(pdf)
-    image_backed_mcids = detect_image_backed_mcids(pdf)
+
+    target_mcids_by_page = collect_empty_alt_figure_mcids(structure_items)
+    image_backed_mcids = detect_image_backed_mcids(
+        pdf,
+        target_mcids_by_page=target_mcids_by_page,
+    )
 
     return structure_items, image_info, image_backed_mcids
 

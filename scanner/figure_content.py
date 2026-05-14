@@ -4,6 +4,7 @@ from typing import Any
 
 import pikepdf
 
+from scanner.models import StructureItem
 from scanner.structure import obj_get, safe_name
 
 
@@ -44,41 +45,102 @@ def _active_mcid(stack: list[int | None]) -> int | None:
     return None
 
 
-def _resolve_xobject(content: Any, operands: list[Any]) -> Any | None:
+def _xobject_name_from_operands(operands: list[Any]) -> str | None:
     if not operands:
         return None
 
-    xobject_name = operands[0]
-    xobject_name_text = safe_name(xobject_name)
+    return safe_name(operands[0])
+
+
+def _image_xobject_names(content: Any) -> set[str]:
+    """
+    Return XObject names on this content object whose subtype is /Image.
+
+    This lets us avoid resolving the same XObject repeatedly for every Do
+    operator in the page content stream.
+    """
+    image_names: set[str] = set()
 
     resources = obj_get(content, "/Resources")
     if resources is None:
-        return None
+        return image_names
 
     xobjects = obj_get(resources, "/XObject")
     if xobjects is None:
-        return None
+        return image_names
 
     try:
-        return xobjects.get(xobject_name)
+        keys = list(xobjects.keys())
     except Exception:
-        pass
+        return image_names
 
-    if xobject_name_text:
+    for key in keys:
         try:
-            return xobjects.get(xobject_name_text)
+            xobject = xobjects.get(key)
         except Exception:
-            pass
+            continue
 
-    return None
+        if safe_name(obj_get(xobject, "/Subtype")) != "/Image":
+            continue
+
+        key_text = safe_name(key)
+        if key_text:
+            image_names.add(key_text)
+
+        image_names.add(str(key))
+
+    return image_names
 
 
-def detect_image_backed_mcids(pdf) -> set[tuple[str, int]]:
+def collect_empty_alt_figure_mcids(
+    structure_items: list[StructureItem],
+) -> dict[str, set[int]]:
+    """
+    Return page_ref -> MCIDs for Figures where image-backed detection matters.
+
+    We only need image-backed detection for Figures with an explicit empty /Alt.
+
+    We do not need it for:
+    - Figures with non-empty /Alt, because they already pass
+    - Figures with no /Alt, because they fail without image-backed detection
+    - Figures with no page_ref or MCIDs, because we cannot match them to content
+    """
+    targets: dict[str, set[int]] = {}
+
+    for item in structure_items:
+        if item.normalized_type != "Figure":
+            continue
+
+        # Non-empty /Alt already passes.
+        if item.alt_source == "/Alt":
+            continue
+
+        # Missing /Alt fails separately; image-backed lookup is not needed.
+        if not item.has_alt_entry:
+            continue
+
+        # At this point, this is an explicit empty-/Alt Figure.
+        if not item.page_ref or not item.mcids:
+            continue
+
+        targets.setdefault(item.page_ref, set()).update(item.mcids)
+
+    return targets
+
+
+def detect_image_backed_mcids(
+    pdf,
+    *,
+    target_mcids_by_page: dict[str, set[int]],
+) -> set[tuple[str, int]]:
     """
     Return (page_ref, mcid) pairs whose marked-content block paints an image
     XObject directly in a page content stream.
 
-    This is intentionally a small first version:
+    This targeted version only scans pages/MCIDs that matter for figure alt-text
+    checking, usually explicit empty-/Alt Figure elements.
+
+    This intentionally remains a small implementation:
     - tracks BMC / BDC / EMC nesting
     - recognizes direct BDC property dictionaries with /MCID
     - treats a block as image-backed when it contains a Do operator whose
@@ -87,9 +149,23 @@ def detect_image_backed_mcids(pdf) -> set[tuple[str, int]]:
     """
     image_backed_mcids: set[tuple[str, int]] = set()
 
+    if not target_mcids_by_page:
+        return image_backed_mcids
+
     for page in pdf.pages:
         page_ref = _object_ref(page.obj)
         if page_ref is None:
+            continue
+
+        target_mcids_for_page = target_mcids_by_page.get(page_ref)
+        if not target_mcids_for_page:
+            continue
+
+        image_xobject_names = _image_xobject_names(page)
+
+        # If this page has no image XObjects, parsing the content stream cannot
+        # produce any image-backed MCID findings.
+        if not image_xobject_names:
             continue
 
         try:
@@ -98,6 +174,7 @@ def detect_image_backed_mcids(pdf) -> set[tuple[str, int]]:
             continue
 
         marked_content_stack: list[int | None] = []
+        found_target_mcids: set[int] = set()
 
         for operands, operator in operations:
             operator_name = str(operator)
@@ -122,8 +199,19 @@ def detect_image_backed_mcids(pdf) -> set[tuple[str, int]]:
             if mcid is None:
                 continue
 
-            xobject = _resolve_xobject(page, operands)
-            if safe_name(obj_get(xobject, "/Subtype")) == "/Image":
-                image_backed_mcids.add((page_ref, mcid))
+            if mcid not in target_mcids_for_page:
+                continue
+
+            xobject_name = _xobject_name_from_operands(operands)
+            if xobject_name not in image_xobject_names:
+                continue
+
+            image_backed_mcids.add((page_ref, mcid))
+            found_target_mcids.add(mcid)
+
+            # Once every target MCID on this page has been confirmed as
+            # image-backed, there is no reason to keep scanning this page.
+            if target_mcids_for_page.issubset(found_target_mcids):
+                break
 
     return image_backed_mcids

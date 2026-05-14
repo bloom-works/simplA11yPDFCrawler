@@ -21,7 +21,10 @@ from scanner.checks.lists import check_lists
 from scanner.checks.tables import check_tables
 from scanner.checks.tagged_content import check_tagged_content
 from scanner.image_detection import detect_image_objects
-from scanner.figure_content import detect_image_backed_mcids
+from scanner.figure_content import (
+    collect_empty_alt_figure_mcids,
+    detect_image_backed_mcids,
+)
 from scanner.structure import load_structure_items
 
 
@@ -117,15 +120,21 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
         result["PDFVersion"] = pdf.pdf_version
         result["Pages"] = len(pdf.pages)
 
+        check_metadata_and_title(pdf, result)
+        check_tagging(pdf, result)
+
         structure_items = []
-        if pdf.Root.get("/StructTreeRoot") is not None:
+        if result.get("TaggedTest") == "Pass":
             structure_items = load_structure_items(pdf)
 
         image_info = detect_image_objects(pdf)
-        image_backed_mcids = detect_image_backed_mcids(pdf)
 
-        check_metadata_and_title(pdf, result)
-        check_tagging(pdf, result)
+        target_mcids_by_page = collect_empty_alt_figure_mcids(structure_items)
+        image_backed_mcids = detect_image_backed_mcids(
+            pdf,
+            target_mcids_by_page=target_mcids_by_page,
+        )
+
         check_tagged_content(pdf, result)
         check_protection(pdf, result)
         check_language(pdf, result)
