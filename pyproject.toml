@@ -1,25 +1,28 @@
 [tool.poetry]
-name = "simpla11ypdfcrawler"
+name = "simpla11ypdf"
 version = "2.0.0"
 description = "PDF accessibility crawler and scanner"
 authors = ["Bloom Works"]
 license = "MIT"
 readme = "README.md"
-packages = [{ include = "scanner" }]
+packages = [{ include = "simpla11ypdf" }]
+repository = "https://github.com/bloom-works/simplA11yPDFCrawler"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-scrapy = "*"
+scrapy = "^2.15.1"
 pikepdf = ">=10.5,<11.0"
-langcodes = "*"
-pdfminer-six = "*"
-bitstring = "*"
-dateparser = "*"
-pytz = "*"
-typer = "*"
+langcodes = "^3.5.1"
+bitstring = "^4.4.0"
+dateparser = "^1.4.0"
+pytz = "^2026.2"
+typer = "^0.25.1"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "*"
+pytest = "^9.0.3"
+
+[tool.poetry.scripts]
+simpla11ypdf = "simpla11ypdf.cli:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

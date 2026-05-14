@@ -959,25 +959,6 @@ packaging = ">=23.0"
 w3lib = ">=1.19.0"
 
 [[package]]
-name = "pdfminer-six"
-version = "20260107"
-description = "PDF parser and analyzer"
-optional = false
-python-versions = ">=3.10"
-groups = ["main"]
-files = [
-    {file = "pdfminer_six-20260107-py3-none-any.whl", hash = "sha256:366585ba97e80dffa8f00cebe303d2f381884d8637af4ce422f1df3ef38111a9"},
-    {file = "pdfminer_six-20260107.tar.gz", hash = "sha256:96bfd431e3577a55a0efd25676968ca4ce8fd5b53f14565f85716ff363889602"},
-]
-
-[package.dependencies]
-charset-normalizer = ">=2.0.0"
-cryptography = ">=36.0.0"
-
-[package.extras]
-image = ["Pillow"]
-
-[[package]]
 name = "pikepdf"
 version = "10.5.1"
 description = "Read, write, repair, and transform PDFs in Python, powered by qpdf"
@@ -2008,4 +1989,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "22aaffacc2b8a89b67d703035ea3f6bc0b34d8e96a4f2e9d459327ef6e89b34c"
+content-hash = "0e1bbfd568ae8d612fbb8084e396ea493749f524f8c8fde416c63d41b5e0758e"
