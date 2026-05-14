@@ -1,6 +1,6 @@
 # simplA11yPDFCrawler
 
-simplA11yReport is a tool supporting the simplified accessibility monitoring method as described in the [commission implementing decision EU 2018/1524](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018D1524&from=EN). It is used by [SIP (Information and Press Service)](https://sip.gouvernement.lu/en.html) in Luxembourg to monitor the websites of public sector bodies.
+simplA11yPDFCrawler is a PDF accessibility crawler and scanner supporting the simplified accessibility monitoring method as described in the [commission implementing decision EU 2018/1524](https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32018D1524&from=EN). It is used by [SIP (Information and Press Service)](https://sip.gouvernement.lu/en.html) in Luxembourg to monitor the websites of public sector bodies.
 
 The tool can be used in two ways:
 
@@ -32,7 +32,7 @@ The checker runs document-level tests, page-content tagging tests, structure-tre
 | Forms          | `xfa`                   | Detects dynamic XFA forms.                                                                                                                                                                                                                            |
 | Annotations    | `TaggedAnnotationsTest` | Checks each link annotation against the structure tree using `/StructParent`, `/ParentTree` and matching `/OBJR` references. This is a structural approximation.                                                                                      |
 | Annotations    | annotation inventory    | Counts annotations, link annotations, widget annotations, internal links and external links.                                                                                                                                                          |
-| Alternate Text | `FiguresAltTextTest`    | Checks figure structure elements for usable alternate text. Distinguishes non-empty `/Alt`, empty `/Alt`, `/ActualText`-only, and missing `/Alt` cases. If `/Alt` is empty, image-backed Figures fail, while vector Figures pass.                     |
+| Alternate Text | `FiguresAltTextTest`    | Checks figure structure elements for usable alternate text. Distinguishes non-empty `/Alt`, empty `/Alt`, `/ActualText`-only, and missing `/Alt` cases. Missing `/Alt` fails. Explicit empty `/Alt` is treated as intentional.                        |
 | Alternate Text | `NestedAltTextTest`     | Checks for alternate text nested inside another alt-bearing structure element.                                                                                                                                                                        |
 | Alternate Text | `HidesAnnotationTest`   | Warns when a form annotation may be hidden by alternate text on the Form element itself or on an alt-bearing ancestor, such as a Table with `/Alt`.                                                                                                   |
 | Images         | image object detection  | Counts image XObjects and pages containing images. Used as a fallback when the PDF is untagged.                                                                                                                                                       |
@@ -55,23 +55,53 @@ Some issues cannot be reliably verified from automated checks alone, including:
 
 ## Installation
 
+### Development install
+
+Clone the repository and install the Python package with Poetry:
+
 ```bash
-git clone https://github.com/accessibility-luxembourg/simplA11yPDFCrawler.git
+git clone https://github.com/bloom-works/simplA11yPDFCrawler.git
 cd simplA11yPDFCrawler
 
+poetry install
 npm install
 
-python -m venv env # on a Mac, use python3 instead of python
-source ./env/bin/activate
-pip install -r requirements.txt
-mkdir crawled_files ; mkdir out
+mkdir -p crawled_files out
 chmod a+x *.sh
 ```
 
-On MacOS, the `timeout` or `gtimeout` commands may not be available. You may need to install the coreutils package via `brew`:
+This installs the `simpla11ypdf` Python package and exposes the `simpla11ypdf` command-line tool.
+
+Check that the CLI is available:
+
+```bash
+poetry run simpla11ypdf --help
+```
+
+On macOS, the `timeout` command may not be available. Install GNU coreutils if needed:
 
 ```bash
 brew install coreutils
+```
+
+### Install from GitHub
+
+If you want to use the scanner as a package from another project, install it from a Git tag:
+
+```bash
+pip install "simpla11ypdf @ git+https://github.com/bloom-works/simplA11yPDFCrawler.git@v2.0.0"
+```
+
+Or with Poetry:
+
+```toml
+simpla11ypdf = { git = "https://github.com/bloom-works/simplA11yPDFCrawler.git", tag = "v2.0.0" }
+```
+
+The package can then be used from Python:
+
+```python
+from simpla11ypdf.scanner import check_file
 ```
 
 ## Usage: crawl and analyze websites
@@ -124,84 +154,84 @@ One row per PDF. This is the main per-file scanner output.
 
 Fields include:
 
-| Field                              | Description                                                                                                                                                                 |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Site`                             | Site/domain associated with the file.                                                                                                                                       |
-| `File`                             | PDF filename.                                                                                                                                                               |
-| `Accessible`                       | `False` if the scanner found a failing accessibility issue.                                                                                                                 |
-| `TotallyInaccessible`              | `True` if the PDF fails critical access checks, such as being untagged and image-only, or blocking assistive technology access.                                             |
-| `BrokenFile`                       | `True` if the PDF could not be opened or parsed.                                                                                                                            |
-| `TaggedTest`                       | Whether the PDF is tagged.                                                                                                                                                  |
-| `TaggedContentTest`                | Whether text shown in page content streams appears to be structurally tagged or artifacted. Fails for meaningful untagged text and warns for whitespace-only untagged text. |
-| `UntaggedContentCount`             | Number of meaningful text-showing operations found outside artifact content and without an active `/MCID`, including text inside Form XObjects.                             |
-| `UntaggedContentSummary`           | Summary of meaningful untagged text-showing operations, including page, source, operator and text snippet.                                                                  |
-| `UntaggedWhitespaceContentCount`   | Number of whitespace-only text-showing operations found outside artifact content and without an active `/MCID`, including text inside Form XObjects.                        |
-| `UntaggedWhitespaceContentSummary` | Summary of whitespace-only untagged text-showing operations, including page, source, operator and text snippet.                                                             |
-| `EmptyTextTest`                    | Whether text content appears to be present.                                                                                                                                 |
-| `ProtectedTest`                    | Whether permissions allow assistive technology access.                                                                                                                      |
-| `TitleTest`                        | Whether the PDF title exists and is shown in the title bar.                                                                                                                 |
-| `LanguageTest`                     | Whether the PDF has a valid document language.                                                                                                                              |
-| `BookmarksTest`                    | Whether a long PDF has bookmarks.                                                                                                                                           |
-| `Exempt`                           | Whether the document appears to predate the legal deadline.                                                                                                                 |
-| `Date`                             | Best available creation/modification date.                                                                                                                                  |
-| `hasTitle`                         | Whether a title is present.                                                                                                                                                 |
-| `hasDisplayDocTitle`               | Whether the Display Document Title flag is set.                                                                                                                             |
-| `hasLang`                          | Whether a document language is present.                                                                                                                                     |
-| `InvalidLang`                      | Whether the language tag is invalid.                                                                                                                                        |
-| `hasBookmarks`                     | Whether bookmarks are present.                                                                                                                                              |
-| `hasXmp`                           | Whether XMP metadata is present.                                                                                                                                            |
-| `PDFVersion`                       | PDF version.                                                                                                                                                                |
-| `Creator`                          | Creator software, if available.                                                                                                                                             |
-| `Producer`                         | Producer software, if available.                                                                                                                                            |
-| `Pages`                            | Page count.                                                                                                                                                                 |
-| `Form`                             | Whether AcroForm fields are present.                                                                                                                                        |
-| `xfa`                              | Whether dynamic XFA appears to be present.                                                                                                                                  |
-| `FormFieldCount`                   | Number of interactive form fields found.                                                                                                                                    |
-| `FormFieldSummary`                 | Debug-style summary of detected fields.                                                                                                                                     |
-| `FormsTest`                        | Whether form fields have descriptions.                                                                                                                                      |
-| `FieldsWithoutDescription`         | Fields missing descriptions.                                                                                                                                                |
-| `TaggedFormFieldsTest`             | Whether form fields appear to be tagged or structurally represented. Field widgets are treated as page-associated if they have `/P` or appear in a page `/Annots` array.    |
-| `UnclearFieldAssociations`         | Field/widget associations that could not be clearly resolved, such as fields with no widget annotation or widgets with no page association through `/P` or page `/Annots`.  |
-| `AnnotationsFound`                 | Whether annotations were found.                                                                                                                                             |
-| `AnnotationCount`                  | Total number of annotations.                                                                                                                                                |
-| `AnnotationSubtypeCounts`          | Count of annotation subtypes.                                                                                                                                               |
-| `LinkAnnotationCount`              | Number of link annotations.                                                                                                                                                 |
-| `WidgetAnnotationCount`            | Number of widget annotations.                                                                                                                                               |
-| `TaggedAnnotationsTest`            | Whether each link annotation is connected to the structure tree through `/StructParent`, `/ParentTree` and a matching `/OBJR` reference.                                    |
-| `TaggedAnnotationIssues`           | Details for link annotations that are missing `/StructParent`, do not resolve through `/ParentTree`, map to an unexpected structure type, or lack a matching `/OBJR`.       |
-| `AnnotationSummary`                | Debug-style summary of detected annotations, including page, subtype, flags, rectangle, action/destination, widget state and structure parent where available.              |
-| `LinkStructureCount`               | Number of `Link` structure elements.                                                                                                                                        |
-| `ExternalLinkAnnotationCount`      | Number of external URI link annotations.                                                                                                                                    |
-| `InternalLinkAnnotationCount`      | Number of internal destination link annotations.                                                                                                                            |
-| `AnnotationPagesWithLinks`         | Number of pages containing link annotations.                                                                                                                                |
-| `HidesAnnotationTest`              | Whether alternate text may hide annotation content. Warns for Form annotations with alternate text directly on the Form element or on an alt-bearing ancestor.              |
-| `HidesAnnotationIssues`            | Details for hides-annotation warnings, including Form elements with `/OBJR` children inside an ancestor with `/Alt` or `/ActualText`.                                       |
-| `ImageObjectsFound`                | Number of image XObjects found.                                                                                                                                             |
-| `PagesWithImages`                  | Number of pages containing image XObjects.                                                                                                                                  |
-| `FiguresFound`                     | Number of `Figure` structure elements.                                                                                                                                      |
-| `FiguresWithAlt`                   | Number of figures with non-empty `/Alt` text.                                                                                                                               |
-| `FiguresWithEmptyAlt`              | Number of figures with an `/Alt` entry that is present but empty. Empty `/Alt` may pass for vector Figures, but fails for image-backed Figures.                             |
-| `FiguresWithActualTextOnly`        | Number of figures using non-empty `/ActualText` but no non-empty `/Alt`.                                                                                                    |
-| `FiguresWithoutAlt`                | Number of figures with no `/Alt` entry at all.                                                                                                                              |
-| `FiguresAltTextTest`               | Figure alternate text result. Fails for missing alternate text, image Figures with empty `/Alt`, and other Figures with no `/Alt` or `/ActualText`.                         |
-| `FiguresAltTextIssues`             | Details of figure alternate-text findings, such as empty `/Alt`, missing `/Alt`, `/ActualText`-only cases.                                                                  |
-| `NestedAltTextTest`                | Nested alternate text result.                                                                                                                                               |
-| `NestedAltTextIssues`              | Details of nested alternate text issues.                                                                                                                                    |
-| `HeadingsTest`                     | Heading hierarchy result.                                                                                                                                                   |
-| `HeadingCount`                     | Number of heading structure elements.                                                                                                                                       |
-| `HeadingSequence`                  | Heading sequence, such as `H1 > H2 > H3`.                                                                                                                                   |
-| `HeadingIssues`                    | Heading hierarchy issues.                                                                                                                                                   |
-| `ListsTest`                        | List structure result.                                                                                                                                                      |
-| `ListCount`                        | Number of list structure elements.                                                                                                                                          |
-| `InvalidListItemParents`           | `LI` elements with invalid parents.                                                                                                                                         |
-| `InvalidListChildren`              | Unusual or invalid direct list children.                                                                                                                                    |
-| `MalformedListNodes`               | Empty or malformed list structures.                                                                                                                                         |
-| `TablesTest`                       | Table structure result.                                                                                                                                                     |
-| `TableCount`                       | Number of table structure elements.                                                                                                                                         |
-| `InvalidTRParents`                 | `TR` elements with invalid parents.                                                                                                                                         |
-| `InvalidCellParents`               | `TH`/`TD` elements with invalid parents.                                                                                                                                    |
-| `TablesWithoutHeaders`             | Tables with no header cells.                                                                                                                                                |
-| `IrregularTables`                  | Tables with uneven row/column structure that may require manual review.                                                                                                     |
+| Field                              | Description                                                                                                                                                                            |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Site`                             | Site/domain associated with the file.                                                                                                                                                  |
+| `File`                             | PDF filename.                                                                                                                                                                          |
+| `Accessible`                       | `False` if the scanner found a failing accessibility issue.                                                                                                                            |
+| `TotallyInaccessible`              | `True` if the PDF fails critical access checks, such as being untagged and image-only, or blocking assistive technology access.                                                        |
+| `BrokenFile`                       | `True` if the PDF could not be opened or parsed.                                                                                                                                       |
+| `TaggedTest`                       | Whether the PDF is tagged.                                                                                                                                                             |
+| `TaggedContentTest`                | Whether text shown in page content streams appears to be structurally tagged or artifacted. Fails for meaningful untagged text and warns for whitespace-only untagged text.            |
+| `UntaggedContentCount`             | Number of meaningful text-showing operations found outside artifact content and without an active `/MCID`, including text inside Form XObjects.                                        |
+| `UntaggedContentSummary`           | Summary of meaningful untagged text-showing operations, including page, source, operator and text snippet.                                                                             |
+| `UntaggedWhitespaceContentCount`   | Number of whitespace-only text-showing operations found outside artifact content and without an active `/MCID`, including text inside Form XObjects.                                   |
+| `UntaggedWhitespaceContentSummary` | Summary of whitespace-only untagged text-showing operations, including page, source, operator and text snippet.                                                                        |
+| `EmptyTextTest`                    | Whether text content appears to be present.                                                                                                                                            |
+| `ProtectedTest`                    | Whether permissions allow assistive technology access.                                                                                                                                 |
+| `TitleTest`                        | Whether the PDF title exists and is shown in the title bar.                                                                                                                            |
+| `LanguageTest`                     | Whether the PDF has a valid document language.                                                                                                                                         |
+| `BookmarksTest`                    | Whether a long PDF has bookmarks.                                                                                                                                                      |
+| `Exempt`                           | Whether the document appears to predate the legal deadline.                                                                                                                            |
+| `Date`                             | Best available creation/modification date.                                                                                                                                             |
+| `hasTitle`                         | Whether a title is present.                                                                                                                                                            |
+| `hasDisplayDocTitle`               | Whether the Display Document Title flag is set.                                                                                                                                        |
+| `hasLang`                          | Whether a document language is present.                                                                                                                                                |
+| `InvalidLang`                      | Whether the language tag is invalid.                                                                                                                                                   |
+| `hasBookmarks`                     | Whether bookmarks are present.                                                                                                                                                         |
+| `hasXmp`                           | Whether XMP metadata is present.                                                                                                                                                       |
+| `PDFVersion`                       | PDF version.                                                                                                                                                                           |
+| `Creator`                          | Creator software, if available.                                                                                                                                                        |
+| `Producer`                         | Producer software, if available.                                                                                                                                                       |
+| `Pages`                            | Page count.                                                                                                                                                                            |
+| `Form`                             | Whether AcroForm fields are present.                                                                                                                                                   |
+| `xfa`                              | Whether dynamic XFA appears to be present.                                                                                                                                             |
+| `FormFieldCount`                   | Number of interactive form fields found.                                                                                                                                               |
+| `FormFieldSummary`                 | Debug-style summary of detected fields.                                                                                                                                                |
+| `FormsTest`                        | Whether form fields have descriptions.                                                                                                                                                 |
+| `FieldsWithoutDescription`         | Fields missing descriptions.                                                                                                                                                           |
+| `TaggedFormFieldsTest`             | Whether form fields appear to be tagged or structurally represented. Field widgets are treated as page-associated if they have `/P` or appear in a page `/Annots` array.               |
+| `UnclearFieldAssociations`         | Field/widget associations that could not be clearly resolved, such as fields with no widget annotation or widgets with no page association through `/P` or page `/Annots`.             |
+| `AnnotationsFound`                 | Whether annotations were found.                                                                                                                                                        |
+| `AnnotationCount`                  | Total number of annotations.                                                                                                                                                           |
+| `AnnotationSubtypeCounts`          | Count of annotation subtypes.                                                                                                                                                          |
+| `LinkAnnotationCount`              | Number of link annotations.                                                                                                                                                            |
+| `WidgetAnnotationCount`            | Number of widget annotations.                                                                                                                                                          |
+| `TaggedAnnotationsTest`            | Whether each link annotation is connected to the structure tree through `/StructParent`, `/ParentTree` and a matching `/OBJR` reference.                                               |
+| `TaggedAnnotationIssues`           | Details for link annotations that are missing `/StructParent`, do not resolve through `/ParentTree`, map to an unexpected structure type, or lack a matching `/OBJR`.                  |
+| `AnnotationSummary`                | Debug-style summary of detected annotations, including page, subtype, flags, rectangle, action/destination, widget state and structure parent where available.                         |
+| `LinkStructureCount`               | Number of `Link` structure elements.                                                                                                                                                   |
+| `ExternalLinkAnnotationCount`      | Number of external URI link annotations.                                                                                                                                               |
+| `InternalLinkAnnotationCount`      | Number of internal destination link annotations.                                                                                                                                       |
+| `AnnotationPagesWithLinks`         | Number of pages containing link annotations.                                                                                                                                           |
+| `HidesAnnotationTest`              | Whether alternate text may hide annotation content. Warns for Form annotations with alternate text directly on the Form element or on an alt-bearing ancestor.                         |
+| `HidesAnnotationIssues`            | Details for hides-annotation warnings, including Form elements with `/OBJR` children inside an ancestor with `/Alt` or `/ActualText`.                                                  |
+| `ImageObjectsFound`                | Number of image XObjects found.                                                                                                                                                        |
+| `PagesWithImages`                  | Number of pages containing image XObjects.                                                                                                                                             |
+| `FiguresFound`                     | Number of `Figure` structure elements.                                                                                                                                                 |
+| `FiguresWithAlt`                   | Number of figures with non-empty `/Alt` text.                                                                                                                                          |
+| `FiguresWithEmptyAlt`              | Number of figures with an `/Alt` entry that is present but empty. Empty `/Alt` may be intentional, but image-backed Figures with empty `/Alt` may trigger a warning for manual review. |
+| `FiguresWithActualTextOnly`        | Number of figures using non-empty `/ActualText` but no non-empty `/Alt`.                                                                                                               |
+| `FiguresWithoutAlt`                | Number of figures with no `/Alt` entry at all.                                                                                                                                         |
+| `FiguresAltTextTest`               | Figure alternate text result. Fails for Figures with no usable `/Alt` or `/ActualText`; warns for `/ActualText`-only cases or image-backed Figures with explicit empty `/Alt`.         |
+| `FiguresAltTextIssues`             | Details of figure alternate-text findings, such as empty `/Alt`, missing `/Alt`, `/ActualText`-only cases.                                                                             |
+| `NestedAltTextTest`                | Nested alternate text result.                                                                                                                                                          |
+| `NestedAltTextIssues`              | Details of nested alternate text issues.                                                                                                                                               |
+| `HeadingsTest`                     | Heading hierarchy result.                                                                                                                                                              |
+| `HeadingCount`                     | Number of heading structure elements.                                                                                                                                                  |
+| `HeadingSequence`                  | Heading sequence, such as `H1 > H2 > H3`.                                                                                                                                              |
+| `HeadingIssues`                    | Heading hierarchy issues.                                                                                                                                                              |
+| `ListsTest`                        | List structure result.                                                                                                                                                                 |
+| `ListCount`                        | Number of list structure elements.                                                                                                                                                     |
+| `InvalidListItemParents`           | `LI` elements with invalid parents.                                                                                                                                                    |
+| `InvalidListChildren`              | Unusual or invalid direct list children.                                                                                                                                               |
+| `MalformedListNodes`               | Empty or malformed list structures.                                                                                                                                                    |
+| `TablesTest`                       | Table structure result.                                                                                                                                                                |
+| `TableCount`                       | Number of table structure elements.                                                                                                                                                    |
+| `InvalidTRParents`                 | `TR` elements with invalid parents.                                                                                                                                                    |
+| `InvalidCellParents`               | `TH`/`TD` elements with invalid parents.                                                                                                                                               |
+| `TablesWithoutHeaders`             | Tables with no header cells.                                                                                                                                                           |
+| `IrregularTables`                  | Tables with uneven row/column structure that may require manual review.                                                                                                                |
 
 When `--debug` is used, additional debug fields may be included:
 
@@ -267,13 +297,13 @@ You can also run the PDF checker directly against one file without crawling a we
 ### Raw JSON output
 
 ```bash
-python pdfCheck.py tojson path/to/file.pdf --pretty
+poetry run simpla11ypdf tojson path/to/file.pdf --pretty
 ```
 
 With debug fields:
 
 ```bash
-python pdfCheck.py tojson path/to/file.pdf --debug --pretty
+poetry run simpla11ypdf tojson path/to/file.pdf --debug --pretty
 ```
 
 The raw JSON output returns the flat internal scanner result, including all individual fields used by the CSV output.
@@ -281,7 +311,7 @@ The raw JSON output returns the flat internal scanner result, including all indi
 ### PDF Accessibility Checker JSON Report
 
 ```bash
-python pdfCheck.py tojsonreport path/to/file.pdf --pretty
+poetry run simpla11ypdf tojsonreport path/to/file.pdf --pretty
 ```
 
 The structured accessibility report output groups results into report categories:
@@ -324,7 +354,7 @@ In the default report mode, scanner warnings are reported with `"Status": "Warni
 #### PDF Accessibility Checker JSON Report: Compatible mode
 
 ```bash
-python pdfCheck.py tojsonreport path/to/file.pdf --compatible --pretty
+poetry run simpla11ypdf tojsonreport path/to/file.pdf --compatible --pretty
 ```
 
 Compatible mode includes additional rules that this scanner does not fully automate, but which recreates the exact data shape as other industry-standard PDF accessibility reports.
@@ -337,9 +367,25 @@ In compatible mode, scanner warnings are reported as `"Failed"` with `"Severity"
 
 This is useful if a consuming application expects the same report categories as other industry-standard PDF accessibility reports.
 
-## Using the checker from Python
+### PDF structure debug output
 
-The scanner can also be imported and used directly in Python.
+To inspect the PDF structure tree for debugging, use the `structure` command:
+
+```bash
+poetry run simpla11ypdf structure path/to/file.pdf
+```
+
+Limit the number of structure items printed:
+
+```bash
+poetry run simpla11ypdf structure path/to/file.pdf --limit 100
+```
+
+This command is intended for debugging, which is useful during development.
+
+## Using the scanner from Python
+
+After installing the package, the scanner can be imported and used directly:
 
 ```python
 from simpla11ypdf.scanner import check_file
