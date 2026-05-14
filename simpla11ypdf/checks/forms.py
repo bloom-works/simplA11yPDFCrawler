@@ -6,7 +6,13 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from simpla11ypdf.models import StructureItem
-from simpla11ypdf.structure import obj_get, safe_name
+from simpla11ypdf.structure import (
+    as_kids,
+    extract_role_map,
+    normalize_struct_type,
+    obj_get,
+    safe_name,
+)
 
 FORM_STRUCT_TYPE = "Form"
 WIDGET_SUBTYPE = "/Widget"
@@ -17,6 +23,8 @@ FIELD_TYPE_MAP = {
     "/Ch": "choice",
     "/Sig": "signature",
 }
+
+MAX_TAGGED_FORM_FIELD_ISSUES = 50
 
 
 @dataclass
@@ -29,6 +37,7 @@ class FormFieldInfo:
     description_source: str | None
     widget_count: int = 0
     page_refs: list[str] = field(default_factory=list)
+    widgets: list[Any] = field(default_factory=list, repr=False)
 
 
 def _object_ref(obj: Any) -> str | None:
@@ -43,6 +52,170 @@ def _object_key(obj: Any) -> tuple[int, int] | None:
         return tuple(obj.objgen)
     except Exception:
         return None
+
+
+def _same_pdf_object(left: Any, right: Any) -> bool:
+    left_key = _object_key(left)
+    right_key = _object_key(right)
+
+    if left_key is not None and right_key is not None:
+        return left_key == right_key
+
+    return left is right
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except Exception:
+        return None
+
+
+def _lookup_number_tree_value(node: Any, key: int) -> Any | None:
+    nums = obj_get(node, "/Nums")
+
+    if nums is not None:
+        try:
+            for index in range(0, len(nums), 2):
+                if int(nums[index]) == key:
+                    return nums[index + 1]
+        except Exception:
+            pass
+
+    kids = obj_get(node, "/Kids")
+
+    if kids is not None:
+        try:
+            for kid in kids:
+                limits = obj_get(kid, "/Limits")
+
+                if limits is not None:
+                    try:
+                        lower = int(limits[0])
+                        upper = int(limits[1])
+
+                        if key < lower or key > upper:
+                            continue
+                    except Exception:
+                        pass
+
+                value = _lookup_number_tree_value(kid, key)
+                if value is not None:
+                    return value
+        except Exception:
+            pass
+
+    return None
+
+
+def _parent_tree_candidates(value: Any) -> list[Any]:
+    candidates: list[Any] = []
+
+    for item in as_kids(value):
+        if obj_get(item, "/S") is not None or obj_get(item, "/K") is not None:
+            candidates.append(item)
+
+    return candidates
+
+
+def _structure_element_has_objr_for_widget(
+    struct_elem: Any,
+    widget_obj: Any,
+) -> bool:
+    for kid in as_kids(obj_get(struct_elem, "/K")):
+        if safe_name(obj_get(kid, "/Type")) != "/OBJR":
+            continue
+
+        obj = obj_get(kid, "/Obj")
+        if _same_pdf_object(obj, widget_obj):
+            return True
+
+    return False
+
+
+def _format_tagged_form_field_issues(issues: list[str]) -> str:
+    summary = issues[:MAX_TAGGED_FORM_FIELD_ISSUES]
+
+    if len(issues) > MAX_TAGGED_FORM_FIELD_ISSUES:
+        summary.append(f"... {len(issues) - MAX_TAGGED_FORM_FIELD_ISSUES} more")
+
+    return " | ".join(summary)
+
+
+def _form_widget_tagging_issues(
+    pdf,
+    fields: list[FormFieldInfo],
+) -> list[str]:
+    issues: list[str] = []
+
+    struct_tree_root = obj_get(pdf.Root, "/StructTreeRoot")
+    parent_tree = obj_get(struct_tree_root, "/ParentTree") if struct_tree_root else None
+    role_map = extract_role_map(pdf)
+
+    for field in fields:
+        field_label = (
+            f"field={field.field_name!r}" if field.field_name else "field=unknown"
+        )
+
+        for widget in field.widgets:
+            ref = _object_ref(widget) or field.object_ref or "unknown-widget"
+            prefix = f"{ref}: {field_label}"
+
+            struct_parent = _int_or_none(obj_get(widget, "/StructParent"))
+
+            if struct_parent is None:
+                issues.append(f"{prefix}: widget annotation has no /StructParent")
+                continue
+
+            if parent_tree is None:
+                issues.append(f"{prefix}: document has no /ParentTree")
+                continue
+
+            parent_value = _lookup_number_tree_value(parent_tree, struct_parent)
+
+            if parent_value is None:
+                issues.append(
+                    f"{prefix}: /StructParent {struct_parent} not found in /ParentTree"
+                )
+                continue
+
+            candidates = _parent_tree_candidates(parent_value)
+
+            if not candidates:
+                issues.append(
+                    f"{prefix}: /StructParent {struct_parent} maps to no structure element"
+                )
+                continue
+
+            mapped_types: list[str] = []
+            compatible_candidates: list[Any] = []
+
+            for candidate in candidates:
+                mapped_type = normalize_struct_type(obj_get(candidate, "/S"), role_map)
+                mapped_types.append(mapped_type or "Unknown")
+
+                if mapped_type == FORM_STRUCT_TYPE:
+                    compatible_candidates.append(candidate)
+
+            if not compatible_candidates:
+                issues.append(
+                    f"{prefix}: /StructParent {struct_parent} maps to "
+                    f"{', '.join(mapped_types)}, expected Form"
+                )
+                continue
+
+            has_matching_objr = any(
+                _structure_element_has_objr_for_widget(candidate, widget)
+                for candidate in compatible_candidates
+            )
+
+            if not has_matching_objr:
+                issues.append(
+                    f"{prefix}: /StructParent {struct_parent} maps to "
+                    f"{', '.join(mapped_types)}, but no OBJR child points back to widget"
+                )
+
+    return issues
 
 
 def _normalize_field_type(value: Any) -> str | None:
@@ -225,6 +398,7 @@ def iter_form_fields(pdf) -> list[FormFieldInfo]:
                     description_source=description_source,
                     widget_count=len(widgets),
                     page_refs=page_refs,
+                    widgets=widgets,
                 )
             )
     except Exception:
@@ -286,7 +460,7 @@ def check_form_fields(
     result["FormFieldCount"] = 0
     result["FieldsWithoutDescription"] = ""
     result["TaggedFormFieldsTest"] = "NotApplicable"
-    result["UnclearFieldAssociations"] = ""
+    result["TaggedFormFieldIssues"] = ""
 
     fields = iter_form_fields(pdf)
     result["FormFieldCount"] = len(fields)
@@ -313,6 +487,10 @@ def check_form_fields(
                 f"{ref}: widget annotation has no page association"
             )
 
+        widget_struct_parents = [
+            _int_or_none(obj_get(widget, "/StructParent")) for widget in field.widgets
+        ]
+
         summaries.append(
             f"{ref}: "
             f"type={field.field_type or 'unknown'} "
@@ -320,11 +498,12 @@ def check_form_fields(
             f"desc={field.description!r} "
             f"desc_source={field.description_source or 'none'} "
             f"widgets={field.widget_count} "
-            f"pages={field.page_refs}"
+            f"pages={field.page_refs} "
+            f"struct_parents={widget_struct_parents}"
         )
 
     result["FieldsWithoutDescription"] = " | ".join(missing_descriptions)
-    result["UnclearFieldAssociations"] = " | ".join(unclear_associations)
+    result["TaggedFormFieldIssues"] = " | ".join(unclear_associations)
     result["FormFieldSummary"] = " | ".join(summaries)
 
     if missing_descriptions:
@@ -335,6 +514,12 @@ def check_form_fields(
         result["FormsTest"] = "Pass"
 
     if result.get("TaggedTest") != "Pass":
+        tagged_field_issues = unclear_associations + [
+            "document is not tagged, so form field structure cannot be verified"
+        ]
+        result["TaggedFormFieldIssues"] = _format_tagged_form_field_issues(
+            tagged_field_issues
+        )
         result["TaggedFormFieldsTest"] = "Fail"
         result["Accessible"] = False
         result["_log"] += "forms-untagged, "
@@ -344,8 +529,25 @@ def check_form_fields(
         item for item in structure_items if item.normalized_type == FORM_STRUCT_TYPE
     ]
 
-    if not form_structs or unclear_associations:
-        result["TaggedFormFieldsTest"] = "Warn"
-        result["_log"] += "forms-tagging-warn, "
+    tagging_issues = _form_widget_tagging_issues(pdf, fields)
+
+    structural_context_issues: list[str] = []
+    if not form_structs and (unclear_associations or tagging_issues):
+        structural_context_issues.append(
+            "document has interactive form fields but no Form structure elements"
+        )
+
+    tagged_field_issues = (
+        unclear_associations + structural_context_issues + tagging_issues
+    )
+
+    result["TaggedFormFieldIssues"] = _format_tagged_form_field_issues(
+        tagged_field_issues
+    )
+
+    if tagged_field_issues:
+        result["TaggedFormFieldsTest"] = "Fail"
+        result["Accessible"] = False
+        result["_log"] += "forms-tagging-fail, "
     else:
         result["TaggedFormFieldsTest"] = "Pass"

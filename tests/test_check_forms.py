@@ -93,7 +93,7 @@ def test_check_form_fields_is_not_applicable_when_no_interactive_fields(
     assert result["FormsTest"] == "NotApplicable"
     assert result["TaggedFormFieldsTest"] == "NotApplicable"
     assert result["FieldsWithoutDescription"] == ""
-    assert result["UnclearFieldAssociations"] == ""
+    assert result["TaggedFormFieldIssues"] == ""
     assert result["Accessible"] is True
 
 
@@ -178,16 +178,20 @@ def test_check_form_fields_fails_for_untagged_pdf_with_interactive_field(
     assert result["FormFieldCount"] >= 1
     assert result["TaggedTest"] == "Fail"
     assert result["TaggedFormFieldsTest"] == "Fail"
+    assert "document is not tagged" in result["TaggedFormFieldIssues"]
     assert result["Accessible"] is False
     assert "forms-untagged" in result["_log"]
 
 
-# Tagged PDF with interactive field(s) but no Form structure elements: warn
-def test_check_form_fields_warns_for_tagged_pdf_without_form_structure_elements(
+# Tagged PDF with a widget structurally connected through
+# /StructParent -> /ParentTree -> Form -> OBJR: pass
+def test_check_form_fields_passes_when_widget_is_structurally_tagged(
     fixtures_dir: Path,
     make_result,
 ):
-    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "forms_tagged_no_form_struct_warn.pdf"
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "forms_tagged_widget_struct_parent_pass.pdf"
+    )
     result = make_result(pdf_path.name)
 
     with open_pdf(pdf_path) as pdf:
@@ -196,9 +200,13 @@ def test_check_form_fields_warns_for_tagged_pdf_without_form_structure_elements(
         check_form_fields(pdf, structure_items, result)
 
     assert result["TaggedTest"] == "Pass"
-    assert result["FormFieldCount"] >= 1
-    assert result["TaggedFormFieldsTest"] == "Warn"
-    assert "forms-tagging-warn" in result["_log"]
+    assert result["FormFieldCount"] == 1
+    assert result["FormsTest"] == "Pass"
+    assert result["TaggedFormFieldsTest"] == "Pass"
+    assert result["TaggedFormFieldIssues"] == ""
+    assert "struct_parents=[2]" in result["FormFieldSummary"]
+    assert result["Accessible"] is True
+    assert "forms-tagging-fail" not in result["_log"]
 
 
 # Tagged PDF with interactive field(s) and Form structure elements: pass
@@ -263,8 +271,55 @@ def test_check_form_fields_passes_when_widget_page_is_inferred_from_page_annots(
     assert result["FormsTest"] == "Pass"
     assert result["TaggedFormFieldsTest"] == "Pass"
 
-    assert result["UnclearFieldAssociations"] == ""
+    assert result["TaggedFormFieldIssues"] == ""
     assert "pages=[]" not in result["FormFieldSummary"]
 
     assert result["Accessible"] is True
     assert "forms-tagging-warn" not in result["_log"]
+
+
+# Real-world Microsoft Word form where Adobe reports tagged form field failures.
+# Widgets are present and page-associated, but they are not connected to the
+# structure tree with /StructParent -> /ParentTree -> /OBJR.
+def test_check_form_fields_fails_for_med_training_widgets_missing_struct_parent(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "forms_med_training_widgets_missing_struct_parent.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_forms(pdf, result)
+        structure_items = build_form_inputs(pdf, result)
+        check_form_fields(pdf, structure_items, result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["FormFieldCount"] == 19
+
+    # Field descriptions are a separate check.
+    assert result["FormsTest"] == "Fail"
+    assert "missing description" in result["FieldsWithoutDescription"]
+
+    # New stricter tagged-widget check.
+    assert result["TaggedFormFieldsTest"] == "Fail"
+    assert "widget annotation has no /StructParent" in result["TaggedFormFieldIssues"]
+    assert "forms-tagging-fail" in result["_log"]
+
+    # Page association should not be the issue here.
+    assert (
+        "widget annotation has no page association"
+        not in result["TaggedFormFieldIssues"]
+    )
+
+    assert (
+        "document has interactive form fields but no Form structure elements"
+        in result["TaggedFormFieldIssues"]
+    )
+
+    assert "widget annotation has no /StructParent" in result["TaggedFormFieldIssues"]
+
+    assert result["Accessible"] is False

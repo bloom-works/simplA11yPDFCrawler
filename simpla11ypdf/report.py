@@ -255,7 +255,7 @@ def _forms_tagged_fields_rule(result: dict, debug: bool = False) -> dict:
     return _status_from_test(
         result,
         "TaggedFormFieldsTest",
-        details_field="UnclearFieldAssociations",
+        details_field="TaggedFormFieldIssues",
     )
 
 

@@ -35,7 +35,7 @@ OUTPUT_FIELDS = [
     "FormsTest",
     "FieldsWithoutDescription",
     "TaggedFormFieldsTest",
-    "UnclearFieldAssociations",
+    "TaggedFormFieldIssues",
     "AnnotationsFound",
     "AnnotationCount",
     "AnnotationSubtypeCounts",
