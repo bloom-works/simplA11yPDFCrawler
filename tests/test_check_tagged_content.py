@@ -215,6 +215,41 @@ def test_tagged_content_warns_for_marked_whitespace_without_mcid(
     assert "tagged-content-whitespace-warn" in result["_log"]
 
 
+def test_tagged_content_check_fails_for_unmarked_image_xobjects_fixture(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "tagged_content_lethbridge_image_xobjects_fail.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
+
+    print(result)
+
+    assert result["TaggedTest"] == "Pass"
+    assert result["TaggedContentTest"] == "Fail"
+    assert result["UntaggedContentCount"] == 2
+
+    assert "page=1" in result["UntaggedContentSummary"]
+
+    assert "op=Do" in result["UntaggedContentSummary"]
+    assert "Image XObject" in result["UntaggedContentSummary"]
+
+    # This fixture confirms both direct page image detection and recursive
+    # Form XObject image detection.
+    assert "source=page" in result["UntaggedContentSummary"]
+    assert "source=xobject" in result["UntaggedContentSummary"]
+
+    assert result["Accessible"] is False
+    assert "tagged-content-fail" in result["_log"]
+
+
 #########################################################
 ################# NO-FIXTURE UNIT TESTS #################
 #########################################################
@@ -245,6 +280,13 @@ def fake_pdf_with_ops(*page_operations):
 
 def fake_form_xobject(operations):
     return FakeContent(operations, subtype="/Form")
+
+
+def fake_image_xobject():
+    return FakeContent(
+        operations=[],
+        subtype="/Image",
+    )
 
 
 def fake_page_with_xobjects(operations, xobjects):
@@ -496,22 +538,85 @@ def test_tagged_content_check_passes_for_form_xobject_inside_artifact(
     assert "tagged-content-fail" not in result["_log"]
 
 
-def test_tagged_content_check_ignores_non_form_xobject(
+def test_tagged_content_check_fails_for_unmarked_image_xobject(
     make_result,
     monkeypatch,
 ):
     patch_parse_content_stream(monkeypatch)
 
-    image_xobject = FakeContent(
-        operations=[
-            (["This should not be parsed"], "Tj"),
-        ],
-        subtype="/Image",
-    )
+    image_xobject = fake_image_xobject()
 
     page = fake_page_with_xobjects(
         [
             (["/Im0"], "Do"),
+        ],
+        {
+            "/Im0": image_xobject,
+        },
+    )
+
+    pdf = FakePdf([page])
+    result = make_result("fake.pdf")
+    result["TaggedTest"] = "Pass"
+
+    check_tagged_content(pdf, result)
+
+    assert result["TaggedContentTest"] == "Fail"
+    assert result["UntaggedContentCount"] == 1
+    assert "page=1" in result["UntaggedContentSummary"]
+    assert "source=page" in result["UntaggedContentSummary"]
+    assert "op=Do" in result["UntaggedContentSummary"]
+    assert "Image XObject" in result["UntaggedContentSummary"]
+    assert "/Im0" in result["UntaggedContentSummary"]
+    assert result["Accessible"] is False
+    assert "tagged-content-fail" in result["_log"]
+
+
+def test_tagged_content_check_passes_for_image_xobject_inside_marked_content_with_mcid(
+    make_result,
+    monkeypatch,
+):
+    patch_parse_content_stream(monkeypatch)
+
+    image_xobject = fake_image_xobject()
+
+    page = fake_page_with_xobjects(
+        [
+            (["/Figure", {"/MCID": 0}], "BDC"),
+            (["/Im0"], "Do"),
+            ([], "EMC"),
+        ],
+        {
+            "/Im0": image_xobject,
+        },
+    )
+
+    pdf = FakePdf([page])
+    result = make_result("fake.pdf")
+    result["TaggedTest"] = "Pass"
+
+    check_tagged_content(pdf, result)
+
+    assert result["TaggedContentTest"] == "Pass"
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedContentSummary"] == ""
+    assert result["Accessible"] is True
+    assert "tagged-content-fail" not in result["_log"]
+
+
+def test_tagged_content_check_passes_for_image_xobject_inside_artifact(
+    make_result,
+    monkeypatch,
+):
+    patch_parse_content_stream(monkeypatch)
+
+    image_xobject = fake_image_xobject()
+
+    page = fake_page_with_xobjects(
+        [
+            (["/Artifact"], "BMC"),
+            (["/Im0"], "Do"),
+            ([], "EMC"),
         ],
         {
             "/Im0": image_xobject,

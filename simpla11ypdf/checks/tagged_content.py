@@ -8,20 +8,23 @@ import pikepdf
 
 from simpla11ypdf.structure import obj_get, safe_name
 
-# Text-showing operators only. This intentionally does not yet flag
-# unmarked vector drawing, images, shadings, or other painted content.
+# Text-showing operators. These can contain meaningful text or whitespace-only
+# text that Adobe may still report as untagged content.
 TEXT_SHOWING_OPERATORS = {"Tj", "TJ", "'", '"'}
 
-# Used to determine whether text is naked page content or inside
+# Used to determine whether content is naked page content or inside
 # marked content / artifact scope.
 MARKED_CONTENT_START_OPERATORS = {"BMC", "BDC"}
 MARKED_CONTENT_END_OPERATOR = "EMC"
 
-# Form XObjects can contain their own content streams. Adobe flags text
-# inside a Form XObject when the XObject is invoked outside marked/artifacted
-# content, so we recurse into /Form XObjects only.
+# XObjects are painted with `Do`.
+# - /Image XObjects are real painted page content. If painted outside an /MCID
+#   and outside an /Artifact scope, Adobe reports them as "Tagged content"
+#   failures.
+# - /Form XObjects can contain nested content streams, so we recurse into them.
 XOBJECT_PAINT_OPERATOR = "Do"
 FORM_XOBJECT_SUBTYPE = "/Form"
+IMAGE_XOBJECT_SUBTYPE = "/Image"
 
 MAX_SUMMARY_ITEMS = 50
 MAX_XOBJECT_DEPTH = 10
@@ -180,7 +183,30 @@ def _is_form_xobject(xobject: Any) -> bool:
     return safe_name(obj_get(xobject, "/Subtype")) == FORM_XOBJECT_SUBTYPE
 
 
-def _iter_untagged_text_in_content_stream(
+def _is_image_xobject(xobject: Any) -> bool:
+    if xobject is None:
+        return False
+
+    return safe_name(obj_get(xobject, "/Subtype")) == IMAGE_XOBJECT_SUBTYPE
+
+
+def _format_image_xobject_text(
+    xobject_name: str | None,
+    xobject: Any | None,
+) -> str:
+    parts = ["Image XObject"]
+
+    if xobject_name:
+        parts.append(xobject_name)
+
+    xobject_ref = _object_ref(xobject)
+    if xobject_ref:
+        parts.append(xobject_ref)
+
+    return " ".join(parts)
+
+
+def _iter_untagged_content_in_content_stream(
     content: Any,
     *,
     page_number: int,
@@ -222,8 +248,6 @@ def _iter_untagged_text_in_content_stream(
             continue
 
         if operator_name in TEXT_SHOWING_OPERATORS:
-            # Same rule as your current implementation:
-            # any marked-content scope means we do not report this as naked text.
             if _is_inside_artifact_scope(stack) or _is_inside_structurally_tagged_scope(
                 stack
             ):
@@ -247,6 +271,29 @@ def _iter_untagged_text_in_content_stream(
         if operator_name == XOBJECT_PAINT_OPERATOR:
             xobject_name, xobject = _resolve_xobject(content, operands)
 
+            # Image XObjects are painted content. If they are outside both an
+            # /Artifact scope and an /MCID-bearing marked-content scope, treat
+            # them as meaningful untagged content.
+            if _is_image_xobject(xobject):
+                if _is_inside_artifact_scope(
+                    stack
+                ) or _is_inside_structurally_tagged_scope(stack):
+                    continue
+
+                issues.append(
+                    UntaggedContentIssue(
+                        page_number=page_number,
+                        operator=operator_name,
+                        text=_format_image_xobject_text(xobject_name, xobject),
+                        source=source,
+                        whitespace_only=False,
+                    )
+                )
+                continue
+
+            # Form XObjects can contain their own content streams. Keep
+            # recursing into them so text/images inside repeated page graphics
+            # can still be checked.
             if not _is_form_xobject(xobject):
                 continue
 
@@ -258,7 +305,7 @@ def _iter_untagged_text_in_content_stream(
                 xobject_source += f" {xobject_ref}"
 
             issues.extend(
-                _iter_untagged_text_in_content_stream(
+                _iter_untagged_content_in_content_stream(
                     xobject,
                     page_number=page_number,
                     marked_content_stack=stack,
@@ -276,7 +323,7 @@ def iter_untagged_text_showing_operations(pdf) -> list[UntaggedContentIssue]:
 
     for page_number, page in enumerate(pdf.pages, start=1):
         issues.extend(
-            _iter_untagged_text_in_content_stream(
+            _iter_untagged_content_in_content_stream(
                 page,
                 page_number=page_number,
                 marked_content_stack=[],
