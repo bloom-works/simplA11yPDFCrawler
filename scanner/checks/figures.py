@@ -11,11 +11,10 @@ def check_figures(
     Inspect normalized structure items and report basic figure/alt-text findings.
 
     Tagged PDF rules:
-    - Pass: every Figure has non-empty /Alt, or has explicit empty /Alt and is
-      known not to be image-backed
-    - Warn: no failing figures, but at least one Figure relies only on /ActualText
-    - Fail: at least one Figure has no usable alternate text and is either
-      image-backed or cannot be proven to be non-image content
+    - Pass: every Figure has non-empty /Alt, or has explicit empty /Alt
+    - Warn: no failing figures, but at least one image-backed Figure has empty /Alt
+    and may need manual review
+    - Fail: at least one Figure has no /Alt and no usable /ActualText
 
     Diagnostic counts:
     - FiguresWithAlt: figures with non-empty /Alt
@@ -91,20 +90,20 @@ def check_figures(
             )
 
         if not fig.alt:
-            # Adobe-aligned behavior observed in the CT experiments:
-            # - an image-backed Figure with empty /Alt fails
-            # - a non-image Figure with explicit empty /Alt passes
+            # Adobe appears to treat an explicit empty /Alt as intentional,
+            # so it should not be counted as a "Figures alternate text" failure.
             #
-            # If we cannot prove that the Figure is non-image content, keep the
-            # stricter existing behavior and fail it.
-            if fig.has_alt_entry and is_image_backed is False:
+            # However, an empty /Alt on image-backed content is still worth manual
+            # review: it is only appropriate if the image is decorative or otherwise
+            # intentionally silent.
+            if fig.has_alt_entry:
+                if is_image_backed is True:
+                    warning_issues.append(
+                        f"{ref}: Figure has empty /Alt; verify the image is decorative"
+                    )
                 continue
 
-            if fig.has_alt_entry:
-                failing_issues.append(
-                    f"{ref}: Figure has empty /Alt and no usable /ActualText"
-                )
-            elif fig.has_actual_text_entry:
+            if fig.has_actual_text_entry:
                 failing_issues.append(
                     f"{ref}: Figure has no /Alt and empty /ActualText"
                 )
@@ -119,6 +118,6 @@ def check_figures(
     elif warning_issues:
         result["FiguresAltTextIssues"] = " | ".join(warning_issues)
         result["FiguresAltTextTest"] = "Warn"
-        result["_log"] += "figures-actualtext, "
+        result["_log"] += "figures-empty-alt-warn, "
     else:
         result["FiguresAltTextTest"] = "Pass"

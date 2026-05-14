@@ -109,7 +109,7 @@ def test_figures_check_warns_for_tagged_pdf_with_actualtext_only(
     assert result["FiguresAltTextTest"] == "Warn"
     assert result["FiguresWithEmptyAlt"] == 0
     assert "uses /ActualText" in result["FiguresAltTextIssues"]
-    assert "figures-actualtext" in result["_log"]
+    assert "figures-empty-alt-warn" in result["_log"]
 
 
 def test_figures_check_fails_for_tagged_pdf_with_figure_missing_alt_text(
@@ -167,10 +167,10 @@ def test_figures_check_fails_for_image_figure_with_empty_alt_text(
     assert result["FiguresWithActualTextOnly"] == 0
     assert result["FiguresWithoutAlt"] == 0
 
-    assert result["FiguresAltTextTest"] == "Fail"
+    assert result["FiguresAltTextTest"] == "Warn"
     assert "empty /Alt" in result["FiguresAltTextIssues"]
-    assert result["Accessible"] is False
-    assert "figures-alt" in result["_log"]
+    assert result["Accessible"] is True
+    assert "figures-alt" not in result["_log"]
 
 
 def test_figures_check_fails_for_untagged_pdf_with_image(
