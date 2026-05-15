@@ -117,7 +117,7 @@ def test_figures_check_warns_for_tagged_pdf_with_actualtext_only(
     assert result["FiguresAltTextTest"] == "Warn"
     assert result["FiguresWithEmptyAlt"] == 0
     assert "uses /ActualText" in result["FiguresAltTextIssues"]
-    assert "figures-empty-alt-warn" in result["_log"]
+    assert "figures-actualtext-warn" in result["_log"]
 
 
 def test_figures_check_fails_for_tagged_pdf_with_figure_missing_alt_text(
@@ -175,10 +175,10 @@ def test_figures_check_fails_for_image_figure_with_empty_alt_text(
     assert result["FiguresWithActualTextOnly"] == 0
     assert result["FiguresWithoutAlt"] == 0
 
-    assert result["FiguresAltTextTest"] == "Warn"
-    assert "empty /Alt" in result["FiguresAltTextIssues"]
-    assert result["Accessible"] is True
-    assert "figures-alt" not in result["_log"]
+    assert result["FiguresAltTextTest"] == "Fail"
+    assert result["FiguresAltTextIssues"] == "(28, 0): Figure has empty /Alt"
+    assert result["Accessible"] is False
+    assert "figures-alt" in result["_log"]
 
 
 def test_figures_check_fails_for_untagged_pdf_with_image(
@@ -261,7 +261,9 @@ def test_figures_check_passes_for_vector_figures_with_empty_alt_text(
     fixtures_dir: Path,
     make_result,
 ):
-    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "figures_vector_empty_alt_pass.pdf"
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "figures_ct_empty_alt_art_container_pass.pdf"
+    )
     result = make_result(pdf_path.name)
 
     with open_pdf(pdf_path) as pdf:
@@ -287,9 +289,21 @@ def test_figures_check_passes_for_vector_figures_with_empty_alt_text(
     assert result["FiguresWithActualTextOnly"] == 0
     assert result["FiguresWithoutAlt"] == 0
 
+    empty_alt_figures = [
+        item
+        for item in structure_items
+        if item.normalized_type == "Figure" and item.has_alt_entry and not item.alt
+    ]
+
+    assert len(empty_alt_figures) == 4
+    assert all(
+        item.parent_type == "Art" or "Art" in item.ancestor_types
+        for item in empty_alt_figures
+    )
+
     # The important Adobe-aligned behavior:
-    # empty /Alt is accepted only because these specific Figures are not
-    # image-backed.
+    # empty /Alt is accepted here because these specific Figures are not
+    # image-backed and appear inside an Art/TextBox-style layout container.
     assert result["FiguresAltTextTest"] == "Pass"
     assert result["FiguresAltTextIssues"] == ""
     assert result["Accessible"] is True
@@ -329,4 +343,47 @@ def test_figures_check_fails_for_vector_figures_with_missing_alt_text(
     assert result["FiguresAltTextTest"] == "Fail"
     assert result["Accessible"] is False
     assert "no /Alt or /ActualText" in result["FiguresAltTextIssues"]
+    assert "figures-alt" in result["_log"]
+
+
+# Real-world Microsoft Word form where Acrobat fails 12 standalone Figure
+# elements with explicit empty /Alt. These figures are vector-backed form
+# lines/boxes, not image XObjects, so this protects the rule that standalone
+# empty-alt Figures still fail even when they are not image-backed.
+def test_figures_check_fails_for_med_training_standalone_empty_alt_figures(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = fixtures_dir / FIXTURE_SUBDIR / "figures_med_training_empty_alt_fail.pdf"
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items, image_info, image_backed_mcids = build_figure_inputs(
+            pdf, result
+        )
+        check_figures(
+            structure_items,
+            result,
+            image_info=image_info,
+            image_backed_mcids=image_backed_mcids,
+        )
+
+    assert result["TaggedTest"] == "Pass"
+
+    # This PDF has 12 Figure elements, each with an explicit empty /Alt.
+    assert result["FiguresFound"] == 12
+    assert result["FiguresWithEmptyAlt"] == 12
+    assert result["FiguresWithAlt"] == 0
+    assert result["FiguresWithActualTextOnly"] == 0
+    assert result["FiguresWithoutAlt"] == 0
+
+    # These are not image XObjects, which is the important regression:
+    # vector-backed standalone empty-alt Figures still fail.
+    assert result["ImageObjectsFound"] == 0
+
+    assert result["FiguresAltTextTest"] == "Fail"
+    assert "Figure has empty /Alt" in result["FiguresAltTextIssues"]
+    assert result["FiguresAltTextIssues"].count("Figure has empty /Alt") == 12
+
+    assert result["Accessible"] is False
     assert "figures-alt" in result["_log"]

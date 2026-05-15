@@ -1,5 +1,37 @@
 from simpla11ypdf.models import StructureItem
 
+LAYOUT_FIGURE_ANCESTOR_TYPES = {
+    "Art",
+}
+
+
+def _has_layout_figure_ancestor(fig: StructureItem) -> bool:
+    """
+    Return true when a Figure appears inside an Art/TextBox-style layout
+    container.
+
+    In tested Acrobat behavior, empty-alt vector Figures inside this kind of
+    layout container may pass, while standalone empty-alt Figures fail.
+    """
+    return fig.parent_type in LAYOUT_FIGURE_ANCESTOR_TYPES or any(
+        ancestor_type in LAYOUT_FIGURE_ANCESTOR_TYPES
+        for ancestor_type in fig.ancestor_types
+    )
+
+
+def _empty_alt_can_be_treated_as_intentional(
+    fig: StructureItem,
+    is_image_backed: bool | None,
+) -> bool:
+    """
+    Empty /Alt is only treated as intentional when the Figure is known not to be
+    image-backed and appears inside a layout/art container.
+    """
+    if is_image_backed is not False:
+        return False
+
+    return _has_layout_figure_ancestor(fig)
+
 
 def check_figures(
     structure_items: list[StructureItem],
@@ -11,10 +43,11 @@ def check_figures(
     Inspect normalized structure items and report basic figure/alt-text findings.
 
     Tagged PDF rules:
-    - Pass: every Figure has non-empty /Alt, or has explicit empty /Alt
-    - Warn: no failing figures, but at least one image-backed Figure has empty /Alt
-    and may need manual review
-    - Fail: at least one Figure has no /Alt and no usable /ActualText
+    - Pass: every Figure has non-empty /Alt, or has explicit empty /Alt in a
+    layout/art container where the Figure appears to be intentionally silent
+    - Warn: no failing figures, but at least one Figure relies only on /ActualText
+    - Fail: at least one Figure has no /Alt and no usable /ActualText, or has
+    explicit empty /Alt outside a layout/art container
 
     Diagnostic counts:
     - FiguresWithAlt: figures with non-empty /Alt
@@ -90,17 +123,14 @@ def check_figures(
             )
 
         if not fig.alt:
-            # Adobe appears to treat an explicit empty /Alt as intentional,
-            # so it should not be counted as a "Figures alternate text" failure.
-            #
-            # However, an empty /Alt on image-backed content is still worth manual
-            # review: it is only appropriate if the image is decorative or otherwise
-            # intentionally silent.
             if fig.has_alt_entry:
-                if is_image_backed is True:
-                    warning_issues.append(
-                        f"{ref}: Figure has empty /Alt; verify the image is decorative"
-                    )
+                if _empty_alt_can_be_treated_as_intentional(fig, is_image_backed):
+                    # Empty /Alt can be intentional for non-image-backed Figures inside
+                    # Art/TextBox-style layout containers. Standalone empty-alt Figures are
+                    # reported because Acrobat fails this pattern in tested files.
+                    continue
+
+                failing_issues.append(f"{ref}: Figure has empty /Alt")
                 continue
 
             if fig.has_actual_text_entry:
@@ -118,6 +148,6 @@ def check_figures(
     elif warning_issues:
         result["FiguresAltTextIssues"] = " | ".join(warning_issues)
         result["FiguresAltTextTest"] = "Warn"
-        result["_log"] += "figures-empty-alt-warn, "
+        result["_log"] += "figures-actualtext-warn, "
     else:
         result["FiguresAltTextTest"] = "Pass"
