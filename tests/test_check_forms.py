@@ -323,3 +323,52 @@ def test_check_form_fields_fails_for_med_training_widgets_missing_struct_parent(
     assert "widget annotation has no /StructParent" in result["TaggedFormFieldIssues"]
 
     assert result["Accessible"] is False
+
+
+# Real-world regression: loan_agreement.pdf has 21 widget annotations total.
+# Adobe reports 17 as Forms > Tagged form fields and 4 as
+# Page Content > Tagged annotations. The form check should own only the
+# top-level AcroForm widget fields, not the child widget annotations.
+def test_check_form_fields_reports_only_top_level_widgets_for_loan_agreement(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "forms_loan_agreement_widget_annotation_split.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_forms(pdf, result)
+        structure_items = build_form_inputs(pdf, result)
+        check_form_fields(pdf, structure_items, result)
+
+    assert result["Form"] is True
+    assert result["FormFieldCount"] == 19
+    assert result["FormsTest"] == "Pass"
+
+    assert result["TaggedFormFieldsTest"] == "Fail"
+
+    issues = result["TaggedFormFieldIssues"]
+
+    assert (
+        "document has interactive form fields but no Form structure elements" in issues
+    )
+
+    # Adobe reports 17 tagged form field failures.
+    assert issues.count("widget annotation has no /StructParent") == 17
+
+    # These child widgets should be owned by TaggedAnnotationsTest instead.
+    assert "(179, 0): field='Committee Name'" not in issues
+    assert "(183, 0): field='Name'" not in issues
+    assert "(190, 0): field='Name'" not in issues
+    assert "(191, 0): field='Committee Name'" not in issues
+
+    # A couple of top-level widget fields should still be owned by Forms.
+    assert "(184, 0): field='Address'" in issues
+    assert "(178, 0): field='Transaction ID'" in issues
+
+    assert result["Accessible"] is False
+    assert "forms-tagging-fail" in result["_log"]

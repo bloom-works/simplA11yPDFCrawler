@@ -11,12 +11,18 @@ from simpla11ypdf.structure import (
     obj_get,
     safe_name,
 )
+from simpla11ypdf.widget_annotations import (
+    is_top_level_acroform_widget,
+    top_level_acroform_widget_keys,
+)
 
 LINK_SUBTYPE = "/Link"
 WIDGET_SUBTYPE = "/Widget"
 LINK_STRUCT_TYPE = "Link"
+FORM_STRUCT_TYPE = "Form"
 
 LINK_COMPATIBLE_STRUCT_TYPES = {"Link", "Reference"}
+WIDGET_COMPATIBLE_STRUCT_TYPES = {"Form"}
 MAX_TAGGED_ANNOTATION_ISSUES = 50
 
 
@@ -157,9 +163,64 @@ def _structure_element_has_objr_for_annotation(
     return False
 
 
-def _link_annotation_tagging_issues(
+def _annotation_kind(annot: AnnotationInfo) -> str:
+    if annot.subtype_raw == LINK_SUBTYPE:
+        return "link annotation"
+
+    if annot.is_widget:
+        return "widget annotation"
+
+    subtype = annot.subtype or "unknown"
+    return f"{subtype} annotation"
+
+
+def _compatible_struct_types_for_annotation(
+    annot: AnnotationInfo,
+) -> tuple[set[str], str]:
+    if annot.subtype_raw == LINK_SUBTYPE:
+        return LINK_COMPATIBLE_STRUCT_TYPES, "Link"
+
+    if annot.is_widget:
+        return WIDGET_COMPATIBLE_STRUCT_TYPES, "Form"
+
+    return set(), "compatible structure element"
+
+
+def _tagged_annotation_candidates(
     pdf,
-    link_annotations: list[AnnotationInfo],
+    annotations: list[AnnotationInfo],
+) -> list[AnnotationInfo]:
+    """
+    Return annotations owned by Page Content > Tagged annotations.
+
+    Top-level AcroForm widget annotations are handled by
+    Forms > Tagged form fields. Child widget annotations still appear in
+    page /Annots and are treated by Adobe as tagged annotations.
+    """
+    form_owned_widget_keys = top_level_acroform_widget_keys(pdf)
+
+    candidates: list[AnnotationInfo] = []
+
+    for annot in annotations:
+        if annot.subtype_raw == LINK_SUBTYPE:
+            candidates.append(annot)
+            continue
+
+        if annot.is_widget:
+            if annot.obj is not None and is_top_level_acroform_widget(
+                annot.obj,
+                form_owned_widget_keys,
+            ):
+                continue
+
+            candidates.append(annot)
+
+    return candidates
+
+
+def _annotation_tagging_issues(
+    pdf,
+    annotations: list[AnnotationInfo],
 ) -> list[str]:
     issues: list[str] = []
 
@@ -167,13 +228,23 @@ def _link_annotation_tagging_issues(
     parent_tree = obj_get(struct_tree_root, "/ParentTree") if struct_tree_root else None
     role_map = extract_role_map(pdf)
 
-    for annot in link_annotations:
+    for annot in annotations:
         ref = annot.object_ref or "unknown-annotation"
-        destination = f" dest={annot.destination!r}" if annot.destination else ""
-        prefix = f"{ref}: page={annot.page_number}{destination}"
+
+        details: list[str] = [f"page={annot.page_number}"]
+
+        if annot.destination:
+            details.append(f"dest={annot.destination!r}")
+
+        if annot.field_name:
+            details.append(f"field={annot.field_name!r}")
+
+        prefix = f"{ref}: {' '.join(details)}"
+        annotation_kind = _annotation_kind(annot)
+        compatible_types, expected_type = _compatible_struct_types_for_annotation(annot)
 
         if annot.struct_parent is None:
-            issues.append(f"{prefix}: link annotation has no /StructParent")
+            issues.append(f"{prefix}: {annotation_kind} has no /StructParent")
             continue
 
         if parent_tree is None:
@@ -203,13 +274,13 @@ def _link_annotation_tagging_issues(
             mapped_type = normalize_struct_type(obj_get(candidate, "/S"), role_map)
             mapped_types.append(mapped_type or "Unknown")
 
-            if mapped_type in LINK_COMPATIBLE_STRUCT_TYPES:
+            if mapped_type in compatible_types:
                 compatible_candidates.append(candidate)
 
         if not compatible_candidates:
             issues.append(
                 f"{prefix}: /StructParent {annot.struct_parent} maps to "
-                f"{', '.join(mapped_types)}, expected Link"
+                f"{', '.join(mapped_types)}, expected {expected_type}"
             )
             continue
 
@@ -374,13 +445,13 @@ def check_annotations(
     result["AnnotationSummary"] = " | ".join(summaries)
     result["AnnotationPagesWithLinks"] = len(link_pages)
 
-    link_annotations = [a for a in annotations if a.subtype_raw == LINK_SUBTYPE]
+    tagged_annotation_candidates = _tagged_annotation_candidates(pdf, annotations)
     link_structs = [
         item for item in structure_items if item.normalized_type == LINK_STRUCT_TYPE
     ]
     result["LinkStructureCount"] = len(link_structs)
 
-    if not link_annotations:
+    if not tagged_annotation_candidates:
         result["TaggedAnnotationsTest"] = "NotApplicable"
         return
 
@@ -390,7 +461,7 @@ def check_annotations(
         result["_log"] += "annotations-untagged, "
         return
 
-    tagging_issues = _link_annotation_tagging_issues(pdf, link_annotations)
+    tagging_issues = _annotation_tagging_issues(pdf, tagged_annotation_candidates)
     result["TaggedAnnotationIssues"] = _format_tagged_annotation_issues(tagging_issues)
 
     if tagging_issues:

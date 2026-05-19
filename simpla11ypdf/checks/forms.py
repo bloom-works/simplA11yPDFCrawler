@@ -13,6 +13,10 @@ from simpla11ypdf.structure import (
     obj_get,
     safe_name,
 )
+from simpla11ypdf.widget_annotations import (
+    is_top_level_acroform_widget,
+    top_level_acroform_widget_keys,
+)
 
 FORM_STRUCT_TYPE = "Form"
 WIDGET_SUBTYPE = "/Widget"
@@ -152,12 +156,22 @@ def _form_widget_tagging_issues(
     parent_tree = obj_get(struct_tree_root, "/ParentTree") if struct_tree_root else None
     role_map = extract_role_map(pdf)
 
+    # Only top-level AcroForm /Fields entries that are themselves /Widget
+    # annotations are owned by Forms > Tagged form fields.
+    #
+    # Child widget annotations are still page annotations, but Adobe appears
+    # to report them under Page Content > Tagged annotations instead.
+    form_owned_widget_keys = top_level_acroform_widget_keys(pdf)
+
     for field in fields:
         field_label = (
             f"field={field.field_name!r}" if field.field_name else "field=unknown"
         )
 
         for widget in field.widgets:
+            if not is_top_level_acroform_widget(widget, form_owned_widget_keys):
+                continue
+
             ref = _object_ref(widget) or field.object_ref or "unknown-widget"
             prefix = f"{ref}: {field_label}"
 

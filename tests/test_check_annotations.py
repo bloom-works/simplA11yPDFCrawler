@@ -240,3 +240,51 @@ def test_check_annotations_fails_for_link_annotation_without_struct_parent(
 
     assert result["Accessible"] is False
     assert "annotations-tagging-fail" in result["_log"]
+
+
+# Real-world regression: loan_agreement.pdf has no /Link annotations, but it
+# does have 4 child /Widget annotations that Adobe reports under
+# Page Content > Tagged annotations rather than Forms > Tagged form fields.
+def test_check_annotations_reports_child_widgets_for_loan_agreement(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "annotations_loan_agreement_widget_annotation_split.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        structure_items = build_annotation_inputs(pdf, result)
+        check_annotations(pdf, structure_items, result)
+
+    assert result["TaggedTest"] == "Pass"
+
+    assert result["AnnotationCount"] == 21
+    assert result["AnnotationsFound"] is True
+    assert result["AnnotationSubtypeCounts"] == "Widget=21"
+    assert result["WidgetAnnotationCount"] == 21
+    assert result["LinkAnnotationCount"] == 0
+    assert result["LinkStructureCount"] == 0
+
+    assert result["TaggedAnnotationsTest"] == "Fail"
+
+    issues = result["TaggedAnnotationIssues"]
+
+    # Adobe reports 4 tagged annotation failures.
+    assert issues.count("widget annotation has no /StructParent") == 4
+
+    assert "(179, 0): page=1 field='Committee Name'" in issues
+    assert "(183, 0): page=1 field='Name'" in issues
+    assert "(190, 0): page=1 field='Name'" in issues
+    assert "(191, 0): page=1 field='Committee Name'" in issues
+
+    # Top-level form widgets should not be duplicated here.
+    assert "(184, 0): page=1 field='Address'" not in issues
+    assert "(178, 0): page=1 field='Transaction ID'" not in issues
+    assert "(193, 0): page=1 field='Loan Amount'" not in issues
+
+    assert result["Accessible"] is False
+    assert "annotations-tagging-fail" in result["_log"]
