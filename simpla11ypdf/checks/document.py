@@ -260,35 +260,31 @@ def check_protection(pdf, result):
 
 
 def check_tagging(pdf, result):
-    """Check whether the PDF has a valid structure tree and is marked as tagged.
+    """Check whether the PDF has a structure tree and is marked as tagged.
 
-    Verifies that ``/StructTreeRoot`` is present in the document root and that
-    ``/MarkInfo/Marked`` is explicitly set to ``True``. Both conditions must
-    hold for the document to be considered tagged.
+    This separates two related but different facts:
 
-    Args:
-        pdf: An open pikepdf :class:`~pikepdf.Pdf` object.
-        result: The scan result dict to update in place.
+    - StructTreeRootPresent: whether the document has /StructTreeRoot.
+    - MarkedAsTagged: whether /MarkInfo/Marked is explicitly true.
 
-    Returns:
-        None. Mutates ``result``, setting ``TaggedTest``, ``Accessible``, and
-        ``_log``.
+    TaggedTest only passes when both are true. This matches Acrobat's
+    high-level "Tagged PDF" check while still letting later checks decide
+    whether a structure tree is available for deeper inspection.
     """
-    # check if Tagged
-    # TODO: extend checks here by verifying that all objects in the document are tagged (cf Matterhorn Checkpoint 01)
     struct_tree_root = pdf.Root.get("/StructTreeRoot")
-    if struct_tree_root is None:
-        result["TaggedTest"] = "Fail"
-        result["Accessible"] = False
-        result["_log"] += "tagged, "
-        return
+    struct_tree_root_present = struct_tree_root is not None
 
     mark_info = pdf.Root.get("/MarkInfo")
     marked = mark_info.get("/Marked") if mark_info is not None else None
+    marked_as_tagged = marked is True
 
-    if marked is None or marked is False:
-        result["TaggedTest"] = "Fail"
-        result["Accessible"] = False
-        result["_log"] += "tagged, "
-    else:
+    result["StructTreeRootPresent"] = struct_tree_root_present
+    result["MarkedAsTagged"] = marked_as_tagged
+
+    if struct_tree_root_present and marked_as_tagged:
         result["TaggedTest"] = "Pass"
+        return
+
+    result["TaggedTest"] = "Fail"
+    result["Accessible"] = False
+    result["_log"] += "tagged, "

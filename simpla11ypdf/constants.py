@@ -6,6 +6,8 @@ OUTPUT_FIELDS = [
     "TotallyInaccessible",
     "BrokenFile",
     "TaggedTest",
+    "StructTreeRootPresent",
+    "MarkedAsTagged",
     "TaggedContentTest",
     "UntaggedContentCount",
     "UntaggedContentSummary",
