@@ -250,6 +250,54 @@ def test_tagged_content_check_fails_for_unmarked_image_xobjects_fixture(
     assert "tagged-content-fail" in result["_log"]
 
 
+def test_tagged_content_runs_when_markinfo_missing_but_structure_tree_exists(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir
+        / FIXTURE_SUBDIR
+        / "tagged_content_struct_tree_markinfo_missing.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
+
+    assert result["TaggedTest"] == "Fail"
+    assert result["StructTreeRootPresent"] is True
+    assert result["MarkedAsTagged"] is False
+
+    assert result["TaggedContentTest"] == "Pass"
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedContentSummary"] == ""
+    assert "tagged-content-fail" not in result["_log"]
+
+
+def test_tagged_content_runs_when_marked_false_but_structure_tree_exists(
+    fixtures_dir: Path,
+    make_result,
+):
+    pdf_path = (
+        fixtures_dir / FIXTURE_SUBDIR / "tagged_content_struct_tree_marked_false.pdf"
+    )
+    result = make_result(pdf_path.name)
+
+    with open_pdf(pdf_path) as pdf:
+        check_tagging(pdf, result)
+        check_tagged_content(pdf, result)
+
+    assert result["TaggedTest"] == "Fail"
+    assert result["StructTreeRootPresent"] is True
+    assert result["MarkedAsTagged"] is False
+
+    assert result["TaggedContentTest"] == "Pass"
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedContentSummary"] == ""
+    assert "tagged-content-fail" not in result["_log"]
+
+
 #########################################################
 ################# NO-FIXTURE UNIT TESTS #################
 #########################################################
@@ -272,6 +320,14 @@ class FakeContent:
 class FakePdf:
     def __init__(self, pages):
         self.pages = pages
+
+
+def make_struct_tree_result(make_result, filename="fake.pdf"):
+    result = make_result(filename)
+    result["StructTreeRootPresent"] = True
+    result["MarkedAsTagged"] = True
+    result["TaggedTest"] = "Pass"
+    return result
 
 
 def fake_pdf_with_ops(*page_operations):
@@ -319,8 +375,7 @@ def test_tagged_content_check_fails_for_unmarked_text_showing_operator(
             (["Hello"], "Tj"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -347,8 +402,7 @@ def test_tagged_content_check_fails_for_text_inside_marked_content_without_mcid(
             ([], "EMC"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -372,8 +426,7 @@ def test_tagged_content_check_passes_for_text_inside_marked_content_with_mcid(
             ([], "EMC"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -397,8 +450,7 @@ def test_tagged_content_check_passes_for_text_inside_artifact(
             ([], "EMC"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -420,8 +472,7 @@ def test_tagged_content_check_warns_for_unmarked_whitespace_text(
             (["   "], "Tj"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -449,8 +500,7 @@ def test_tagged_content_check_fails_for_unmarked_tj_array_text(
             ([["Hel", -120, "lo"]], "TJ"),
         ]
     )
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -486,8 +536,7 @@ def test_tagged_content_check_fails_for_unmarked_text_inside_form_xobject(
     )
 
     pdf = FakePdf([page])
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -526,8 +575,7 @@ def test_tagged_content_check_passes_for_form_xobject_inside_artifact(
     )
 
     pdf = FakePdf([page])
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -556,8 +604,7 @@ def test_tagged_content_check_fails_for_unmarked_image_xobject(
     )
 
     pdf = FakePdf([page])
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -592,8 +639,7 @@ def test_tagged_content_check_passes_for_image_xobject_inside_marked_content_wit
     )
 
     pdf = FakePdf([page])
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -624,8 +670,7 @@ def test_tagged_content_check_passes_for_image_xobject_inside_artifact(
     )
 
     pdf = FakePdf([page])
-    result = make_result("fake.pdf")
-    result["TaggedTest"] = "Pass"
+    result = make_struct_tree_result(make_result)
 
     check_tagged_content(pdf, result)
 
@@ -634,3 +679,26 @@ def test_tagged_content_check_passes_for_image_xobject_inside_artifact(
     assert result["UntaggedContentSummary"] == ""
     assert result["Accessible"] is True
     assert "tagged-content-fail" not in result["_log"]
+
+
+def test_tagged_content_check_fails_when_no_structure_tree(
+    make_result,
+    monkeypatch,
+):
+    patch_parse_content_stream(monkeypatch)
+
+    pdf = fake_pdf_with_ops(
+        [
+            (["Hello"], "Tj"),
+        ]
+    )
+    result = make_result("fake.pdf")
+    result["StructTreeRootPresent"] = False
+    result["MarkedAsTagged"] = False
+    result["TaggedTest"] = "Fail"
+
+    check_tagged_content(pdf, result)
+
+    assert result["TaggedContentTest"] == "Fail"
+    assert result["UntaggedContentCount"] == 0
+    assert result["UntaggedContentSummary"] == ""

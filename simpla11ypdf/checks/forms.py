@@ -527,9 +527,9 @@ def check_form_fields(
     else:
         result["FormsTest"] = "Pass"
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         tagged_field_issues = unclear_associations + [
-            "document is not tagged, so form field structure cannot be verified"
+            "document has no structure tree, so form field structure cannot be verified"
         ]
         result["TaggedFormFieldIssues"] = _format_tagged_form_field_issues(
             tagged_field_issues

@@ -455,7 +455,7 @@ def check_annotations(
         result["TaggedAnnotationsTest"] = "NotApplicable"
         return
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         result["TaggedAnnotationsTest"] = "Fail"
         result["Accessible"] = False
         result["_log"] += "annotations-untagged, "

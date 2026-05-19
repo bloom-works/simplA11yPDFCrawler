@@ -267,7 +267,7 @@ def check_tables(structure_items: list[StructureItem], result: dict) -> None:
     result["TablesWithoutHeaders"] = ""
     result["IrregularTables"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         result["TablesTest"] = "NotApplicable"
         return
 

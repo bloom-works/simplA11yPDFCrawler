@@ -143,6 +143,10 @@ def _needs_manual_check(note: str | None = None) -> dict:
     return outcome
 
 
+def _has_structure_tree(result: dict) -> bool:
+    return result.get("StructTreeRootPresent") is True
+
+
 def _status_from_test(
     result: dict,
     field: str,
@@ -185,9 +189,12 @@ def _unsupported_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _unsupported_structure_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; this structure-dependent rule cannot be verified."
+            details=(
+                "Document has no structure tree; this structure-dependent "
+                "rule cannot be verified."
+            )
         )
 
     return _skipped(note="This rule is not checked by this scanner.")
@@ -201,9 +208,12 @@ def _open_pdf_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _tagged_content_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; page content cannot be verified as tagged."
+            details=(
+                "Document has no structure tree; page content cannot be "
+                "verified as tagged."
+            )
         )
 
     raw = result.get("TaggedContentTest")
@@ -277,10 +287,10 @@ def _structure_dependent_test(
     details_field: str | None = None,
 ):
     def resolver(result: dict, debug: bool = False) -> dict:
-        if result.get("TaggedTest") == "Fail":
+        if not _has_structure_tree(result):
             return _failed(
                 details=(
-                    "Document is not tagged; this structure-dependent rule "
+                    "Document has no structure tree; this structure-dependent rule "
                     "cannot be verified."
                 )
             )
@@ -296,9 +306,9 @@ def _structure_dependent_test(
 
 
 def _table_rows_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; table row structure cannot be verified."
+            details="Document has no structure tree; table row structure cannot be verified."
         )
 
     details = result.get("InvalidTRParents")
@@ -309,9 +319,9 @@ def _table_rows_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _table_cells_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; table cell structure cannot be verified."
+            details="Document has no structure tree; table cell structure cannot be verified."
         )
 
     details = result.get("InvalidCellParents")
@@ -322,9 +332,9 @@ def _table_cells_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _table_headers_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; table headers cannot be verified."
+            details="Document has no structure tree; table headers cannot be verified."
         )
 
     details = result.get("TablesWithoutHeaders")
@@ -335,9 +345,9 @@ def _table_headers_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _table_regularity_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; table regularity cannot be verified."
+            details="Document has no structure tree; table regularity cannot be verified."
         )
 
     details = result.get("IrregularTables")
@@ -359,9 +369,9 @@ def _table_summary_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _list_items_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; list item structure cannot be verified."
+            details="Document has no structure tree; list item structure cannot be verified."
         )
 
     malformed = result.get("MalformedListNodes") or ""
@@ -377,9 +387,12 @@ def _list_items_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _lbl_lbody_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; list label/body structure cannot be verified."
+            details=(
+                "Document has no structure tree; list label/body structure "
+                "cannot be verified."
+            )
         )
 
     malformed = result.get("MalformedListNodes") or ""
@@ -402,9 +415,9 @@ def _lbl_lbody_rule(result: dict, debug: bool = False) -> dict:
 
 
 def _headings_rule(result: dict, debug: bool = False) -> dict:
-    if result.get("TaggedTest") == "Fail":
+    if not _has_structure_tree(result):
         return _failed(
-            details="Document is not tagged; heading structure cannot be verified."
+            details="Document has no structure tree; heading structure cannot be verified."
         )
 
     heading_status = result.get("HeadingsTest")

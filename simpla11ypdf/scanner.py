@@ -124,7 +124,7 @@ def check_file(file_name: str, site: str = None, debug: bool = False):
         check_tagging(pdf, result)
 
         structure_items = []
-        if result.get("TaggedTest") == "Pass":
+        if result.get("StructTreeRootPresent") is True:
             structure_items = load_structure_items(pdf)
 
         image_info = detect_image_objects(pdf)

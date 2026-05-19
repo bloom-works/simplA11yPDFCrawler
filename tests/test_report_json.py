@@ -6,6 +6,8 @@ def base_result():
         "ProtectedTest": "Pass",
         "EmptyTextTest": "Pass",
         "TaggedTest": "Pass",
+        "StructTreeRootPresent": True,
+        "MarkedAsTagged": True,
         "TaggedContentTest": "Pass",
         "UntaggedContentSummary": "",
         "LanguageTest": "Pass",
@@ -128,10 +130,12 @@ def test_report_marks_tagged_content_failed_when_tagged_content_test_fails_debug
     assert report["Summary"]["Warning"] == 0
 
 
-def test_report_marks_tagged_content_failed_when_document_is_not_tagged_debug():
+def test_report_marks_tagged_content_failed_when_document_has_no_structure_tree_debug():
     result = {
         **base_result(),
         "TaggedTest": "Fail",
+        "StructTreeRootPresent": False,
+        "MarkedAsTagged": False,
         "TaggedContentTest": "Fail",
     }
 
@@ -145,8 +149,36 @@ def test_report_marks_tagged_content_failed_when_document_is_not_tagged_debug():
 
     assert tagged_content["Status"] == "Failed"
     assert tagged_content["Details"] == (
-        "Document is not tagged; page content cannot be verified as tagged."
+        "Document has no structure tree; page content cannot be verified as tagged."
     )
+
+
+def test_report_maps_structure_rules_from_result_when_tagged_test_fails_but_structure_tree_exists():
+    result = {
+        **base_result(),
+        "TaggedTest": "Fail",
+        "StructTreeRootPresent": True,
+        "MarkedAsTagged": False,
+        "TaggedContentTest": "Pass",
+        "ListsTest": "NotApplicable",
+        "HeadingsTest": "Warn",
+        "HeadingIssues": "No headings found in tagged document",
+    }
+
+    report = build_json_report(result, compatible=True, debug=True)
+
+    tagged_pdf = find_rule(report, "Document", "Tagged PDF")
+    tagged_content = find_rule(report, "Page Content", "Tagged content")
+    list_items = find_rule(report, "Lists", "List items")
+    lbl_lbody = find_rule(report, "Lists", "Lbl and LBody")
+    headings = find_rule(report, "Headings", "Appropriate nesting")
+
+    assert tagged_pdf["Status"] == "Failed"
+
+    assert tagged_content["Status"] == "Passed"
+    assert list_items["Status"] == "Passed"
+    assert lbl_lbody["Status"] == "Passed"
+    assert headings["Status"] == "Passed"
 
 
 def test_report_includes_figure_alt_text_issue_details_debug():

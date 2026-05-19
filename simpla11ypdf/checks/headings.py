@@ -36,7 +36,7 @@ def check_headings(structure_items: list[StructureItem], result: dict) -> None:
     result["HeadingSequence"] = ""
     result["HeadingIssues"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         result["HeadingsTest"] = "NotApplicable"
         return
 

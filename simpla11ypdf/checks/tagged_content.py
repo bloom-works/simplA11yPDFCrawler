@@ -359,7 +359,7 @@ def check_tagged_content(pdf, result: dict) -> None:
     result["UntaggedWhitespaceContentCount"] = 0
     result["UntaggedWhitespaceContentSummary"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         result["TaggedContentTest"] = "Fail"
         return
 

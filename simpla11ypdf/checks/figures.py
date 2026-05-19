@@ -72,9 +72,9 @@ def check_figures(
     result["FiguresWithoutAlt"] = 0
     result["FiguresAltTextIssues"] = ""
 
-    # Untagged fallback:
-    # if the PDF is not tagged, structure-based figure analysis is not reliable.
-    if result.get("TaggedTest") != "Pass":
+    # No structure tree fallback:
+    # if the PDF has no structure tree, structure-based figure analysis is not reliable.
+    if result.get("StructTreeRootPresent") is not True:
         if image_info["ImageObjectsFound"] > 0:
             result["FiguresAltTextTest"] = "Fail"
             result["Accessible"] = False

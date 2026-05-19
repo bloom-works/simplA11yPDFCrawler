@@ -44,7 +44,7 @@ def check_nested_alt_text(structure_items: list[StructureItem], result: dict) ->
     result["NestedAltTextTest"] = "NotApplicable"
     result["NestedAltTextIssues"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         return
 
     alt_indexes = [
@@ -100,7 +100,7 @@ def check_hides_annotation(structure_items: list[StructureItem], result: dict) -
     result["HidesAnnotationTest"] = "NotApplicable"
     result["HidesAnnotationIssues"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         return
 
     issues: list[str] = []

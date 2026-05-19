@@ -178,7 +178,7 @@ def test_check_form_fields_fails_for_untagged_pdf_with_interactive_field(
     assert result["FormFieldCount"] >= 1
     assert result["TaggedTest"] == "Fail"
     assert result["TaggedFormFieldsTest"] == "Fail"
-    assert "document is not tagged" in result["TaggedFormFieldIssues"]
+    assert "document has no structure tree" in result["TaggedFormFieldIssues"]
     assert result["Accessible"] is False
     assert "forms-untagged" in result["_log"]
 

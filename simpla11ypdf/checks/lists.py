@@ -57,7 +57,7 @@ def check_lists(structure_items: list[StructureItem], result: dict) -> None:
     result["InvalidListChildren"] = ""
     result["MalformedListNodes"] = ""
 
-    if result.get("TaggedTest") != "Pass":
+    if result.get("StructTreeRootPresent") is not True:
         result["ListsTest"] = "NotApplicable"
         return
 
