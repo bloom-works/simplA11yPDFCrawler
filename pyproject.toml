@@ -12,8 +12,8 @@ authors = [
 keywords = ["pdf", "accessibility", "wcag"]
 
 dependencies = [
-  "scrapy>=2.15,<3.0",
-  "pikepdf>=10.5,<11.0",
+  "scrapy>=2.16,<3.0",
+  "pikepdf>=10.7,<11.0",
   "langcodes>=3.5,<4.0",
   "bitstring>=4.4,<5.0",
   "dateparser>=1.4,<2.0",
